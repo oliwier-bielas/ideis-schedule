@@ -1,454 +1,285 @@
-<a class="skip-link" href="#plan">Przejdź do planu zajęć</a>
 <div class="app-shell">
-  <nav class="nav-rail" aria-label="Nawigacja główna">
-    <a href="./" class="brand-mark" aria-label="FizjoPlan — strona główna"
-      ><app-icon name="activity"
-    /></a>
-    <a href="#plan" class="rail-active" matTooltip="Plan zajęć" aria-label="Plan zajęć"
-      ><app-icon name="calendar"
-    /></a>
-    <div class="rail-bottom">
-      <a
-        [href]="source"
-        target="_blank"
-        rel="noopener"
-        matTooltip="Harmonogram IDEIS"
-        aria-label="Otwórz harmonogram IDEIS"
-        ><app-icon name="external" /></a
-      ><span class="rail-avatar" matTooltip="Grupa 1 i 1A"><app-icon name="user" /></span>
-    </div>
-  </nav>
+  <header class="site-header">
+    <a class="brand-mark" href="./" aria-label="FizjoPlan — strona główna"
+      ><app-icon name="activity" /><span><strong>Fizjo</strong>Plan</span></a
+    >
+    <button
+      class="group-label"
+      [matMenuTriggerFor]="groupMenu"
+      #groupTrigger="matMenuTrigger"
+      [class.is-open]="groupTrigger.menuOpen"
+      aria-label="Wybierz grupę"
+    >
+      <app-icon name="users" /><span>{{
+        selectedGroup() ? 'Grupa ' + selectedGroup() : 'Wybierz grupę'
+      }}</span
+      ><app-icon class="select-chevron" name="down" />
+    </button>
+    <mat-menu #groupMenu="matMenu" class="group-menu" xPosition="before" aria-label="Wybór grupy">
+      <div class="group-menu-heading">Grupa laboratoryjna</div>
+      @for (group of ['1A', '1B']; track group) {
+        <button
+          mat-menu-item
+          class="group-option"
+          role="menuitemradio"
+          [attr.aria-checked]="selectedGroup() === group"
+          [class.selected-group]="selectedGroup() === group"
+          (click)="chooseGroup(group)"
+        >
+          <span>Grupa {{ group }}</span
+          ><app-icon [name]="selectedGroup() === group ? 'check' : 'users'" />
+        </button>
+      }
+    </mat-menu>
+  </header>
 
-  <div class="workspace">
-    <header class="topbar">
-      <div class="page-title">
-        <span class="wordmark">Fizjo<span>Plan</span></span
-        ><span class="title-divider"></span>
+  @if (selectedGroup()) {
+    <main>
+      @if (!preferenceSaved()) {
+        <p class="preference-note" role="status">
+          Przeglądarka nie pozwala zapisać wyboru. Przy następnym wejściu wybierz grupę ponownie.
+        </p>
+      }
+      <div class="page-heading">
         <h1>Plan zajęć</h1>
+        <button mat-icon-button [matMenuTriggerFor]="actionsMenu" aria-label="Więcej akcji">
+          <app-icon name="more" />
+        </button>
       </div>
-      <div class="header-date">
-        <span>{{ dateLabel(now().date, { weekday: 'long', day: 'numeric', month: 'long' }) }}</span
-        ><span class="header-time">{{ now().time }}</span>
-      </div>
-      <span class="header-group"><app-icon name="users" /> Grupa 1 + 1A</span>
-    </header>
+      <mat-menu #actionsMenu="matMenu">
+        <button mat-menu-item (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" /><span>Odśwież plan</span>
+        </button>
+        <button mat-menu-item (click)="exportCsv()" [disabled]="!weekendLessons().length">
+          <app-icon name="download" /><span>Eksportuj zjazd do CSV</span>
+        </button>
+        <a mat-menu-item [href]="source" target="_blank" rel="noopener noreferrer"
+          ><app-icon name="external" /><span>Otwórz plan IDEIS</span></a
+        >
+      </mat-menu>
 
-    @if (error()) {
-      <div class="error-banner" role="alert">
-        <app-icon name="alert" />
-        <div>
-          <strong>{{
-            stale() ? 'Pokazujemy ostatnio zapisany plan' : 'Nie udało się pobrać planu'
-          }}</strong>
-          <p>{{ error() }}</p>
-          @if (stale()) {
-            <small>Ostatnie pobranie: {{ syncLabel() }}. Dane mogą być nieaktualne.</small>
-          }
+      @if (error()) {
+        <div class="error-banner" role="alert">
+          <app-icon name="alert" />
+          <div>
+            <strong>{{
+              stale() ? 'Pokazujemy ostatnio zapisany plan.' : 'Nie udało się pobrać planu.'
+            }}</strong>
+            <p>{{ error() }}</p>
+          </div>
+          <button mat-button (click)="load()" [disabled]="loading()">Ponów</button>
         </div>
-        <button mat-stroked-button (click)="load()" [disabled]="loading()">Spróbuj ponownie</button>
-      </div>
-    }
+      }
 
-    <main class="planner">
-      <aside class="agenda-panel" aria-label="Najbliższe zajęcia i plan dnia">
-        <div class="agenda-heading">
-          <span class="eyebrow">TWÓJ RYTM STUDIÓW</span>
-          <h2>Wszystko w swoim czasie.</h2>
-          <p>Fizjoterapia · studia niestacjonarne</p>
-        </div>
-
+      @if (featured(); as lesson) {
         <section
           class="live-card"
-          [class.is-current]="!!live().current"
-          aria-label="Bieżące i najbliższe zajęcia"
-          [attr.aria-busy]="loading()"
+          aria-label="Najbliższe zajęcia"
+          [class.is-live]="live().current"
+          [style.--subject-color]="featuredPalette().color"
+          [style.--subject-background]="featuredPalette().background"
         >
-          @if (loading() && !schedule()) {
-            <div class="live-label"><span class="status-dot"></span> Pobieranie planu</div>
-            <div class="skeleton"></div>
-            <p>Łączymy się z harmonogramem IDEIS.</p>
-            <mat-progress-bar mode="indeterminate" aria-label="Pobieranie planu" />
-          } @else if (!schedule()) {
-            <div class="live-label"><app-icon name="info" /> Plan niedostępny</div>
-            <h3>Czekamy na Twój plan.</h3>
-            <p>Spróbuj ponownie, gdy połączenie wróci.</p>
-          } @else {
-            <div class="live-label">
-              <span class="status-dot"></span
-              >{{
-                live().current
-                  ? 'Teraz trwają'
-                  : live().state === 'break'
-                    ? 'Przerwa'
-                    : 'Najbliższe zajęcia'
-              }}
-            </div>
-            @if (featured(); as lesson) {
-              <button class="featured-lesson" (click)="showDetails(lesson)">
-                <strong>{{ lesson.title }}</strong
-                ><span
-                  >{{
-                    dateLabel(lesson.date, { weekday: 'short', day: 'numeric', month: 'short' })
-                  }}
-                  <i>·</i> {{ lesson.start }}–{{ lesson.end }}</span
-                ><span
-                  ><app-icon [name]="lesson.online ? 'video' : 'pin'" />{{ room(lesson) }}</span
-                >
-                <span><app-icon name="user" />{{ lesson.teacher }}</span>
-              </button>
-              <div class="live-countdown"><app-icon name="clock" />{{ remaining() }}</div>
+          <div class="featured-status">
+            <span>
               @if (live().current) {
-                <mat-progress-bar
-                  mode="determinate"
-                  [value]="progress()"
-                  aria-label="Postęp zajęć"
-                />
-              }
-              @if (live().current && live().next; as next) {
-                <div class="next-line">
-                  <small>Następnie</small><strong>{{ next.title }}</strong
-                  ><span
-                    >{{ next.start }} · {{ room(next) }}
-                    @if (nextGap()) {
-                      · {{ nextGap() }} min przerwy
-                    }
-                  </span>
-                </div>
-              }
-            } @else {
-              <h3>{{ statusHeading() }}</h3>
-              <p>
-                {{
-                  lessons().length
-                    ? 'Nie masz już kolejnych zajęć w pobranym semestrze.'
-                    : 'Nie dodano jeszcze planu zajęć.'
-                }}
-              </p>
+                <i class="live-dot"></i>Trwa teraz
+              } @else {
+                Najbliższe zajęcia
+              }</span
+            ><span>{{ relativeDate(lesson.date) }}</span>
+          </div>
+          <h2>{{ lesson.title }}</h2>
+          <div class="featured-bottom">
+            <span
+              >{{ lesson.start }}–{{ lesson.end }}<span class="dot-separator">·</span
+              >{{ room(lesson) }}</span
+            >
+            @if (remaining()) {
+              <span class="remaining">{{ remaining() }}</span>
             }
+          </div>
+          @if (live().current) {
+            <mat-progress-bar
+              mode="determinate"
+              [value]="progress()"
+              aria-label="Postęp bieżących zajęć"
+            />
           }
         </section>
-
-        <div class="daily-heading">
+      } @else if (loading() && !schedule()) {
+        <section class="loading-card" role="status">
+          <span class="loading-dot"></span>
           <div>
-            <small>{{
-              dateLabel(focusedDay().date, { weekday: 'long', day: 'numeric', month: 'long' })
-            }}</small>
-            <h2>
-              Twój plan na dzień<span>{{ schedule() ? focusedDay().lessons.length : '–' }}</span>
-            </h2>
+            <strong>Pobieramy Twój plan</strong>
+            <p>Łączymy się z harmonogramem IDEIS…</p>
           </div>
-        </div>
-        <label class="search-field"
-          ><app-icon name="search" /><input
-            type="search"
-            placeholder="Szukaj zajęć, sali…"
-            aria-label="Szukaj zajęć, prowadzącego lub sali"
-            [value]="query()"
-            (input)="query.set($any($event.target).value)"
-        /></label>
-        <div class="day-tabs" aria-label="Wybierz dzień planu">
-          @for (day of days(); track day.date) {
-            <button
-              [class.selected]="selectedDay() === day.index"
-              [attr.aria-pressed]="selectedDay() === day.index"
-              (click)="selectedDay.set(day.index)"
-            >
-              {{ day.short }} <span>{{ dateLabel(day.date, { day: 'numeric' }) }}</span>
-            </button>
-          }
-        </div>
+        </section>
+      } @else if (schedule()) {
+        <section class="no-upcoming">
+          <app-icon name="calendar" />
+          <div>
+            <strong>Brak kolejnych zajęć w planie</strong>
+            <p>Możesz przejrzeć poprzednie zjazdy poniżej.</p>
+          </div>
+        </section>
+      }
 
-        <div class="agenda-list">
-          @if (loading() && !schedule()) {
-            @for (n of [0, 1, 2]; track n) {
-              <div class="agenda-skeleton">
-                <div class="skeleton"></div>
-                <div class="skeleton short"></div>
-              </div>
-            }
-          } @else if (!schedule()) {
-            <div class="agenda-empty">
-              <app-icon name="info" />
-              <p>Plan niedostępny</p>
-            </div>
-          } @else {
-            @for (lesson of focusedDay().lessons; track lesson.id) {
-              <button
-                class="agenda-item"
-                [class.active]="active(lesson)"
-                [class.past]="past(lesson)"
-                (click)="showDetails(lesson)"
-              >
-                <span class="agenda-time"
-                  ><i [class]="typeClass(lesson)"></i>{{ lesson.start }}–{{ lesson.end
-                  }}<app-icon name="right" /></span
-                ><strong>{{ lesson.title }}</strong
-                ><span class="agenda-teacher"><app-icon name="user" />{{ lesson.teacher }}</span
-                ><span class="agenda-location"
-                  ><app-icon [name]="lesson.online ? 'video' : 'pin'" />{{ room(lesson)
-                  }}<span>{{
-                    lesson.group === 'all' ? 'Wspólny' : 'Gr. ' + lesson.group
-                  }}</span></span
-                >
-              </button>
-            } @empty {
-              <div class="agenda-empty">
-                <app-icon name="leaf" />
-                <p>{{ query() ? 'Brak wyników wyszukiwania' : 'Brak zaplanowanych zajęć' }}</p>
-              </div>
-            }
-          }
-        </div>
-        <div class="agenda-bottom">
-          <app-icon name="users" /><span
-            >Ćwiczenia <strong>1</strong> · laboratoria <strong>1A</strong
-            ><small>Wykłady wspólne dla roku</small></span
-          ><app-icon name="check" />
-        </div>
-      </aside>
-
-      <section id="plan" class="calendar-panel" aria-label="Plan weekendu">
-        <div class="calendar-toolbar">
-          <div class="weekend-nav">
-            <div class="arrow-pair">
-              <button mat-icon-button (click)="moveWeekend(-1)" aria-label="Poprzedni weekend">
-                <app-icon name="left" /></button
-              ><button mat-icon-button (click)="moveWeekend(1)" aria-label="Następny weekend">
-                <app-icon name="right" />
-              </button>
-            </div>
+      <section class="schedule-section" aria-label="Plan zjazdu">
+        <div class="weekend-navigation">
+          <div class="weekend-date">
             <h2>{{ weekendLabel() }}</h2>
-            <button mat-button class="today-button" (click)="resetWeekend()">Bieżący</button>
+            <span>{{ dateLabel(weekend(), { year: 'numeric' }) }}</span>
           </div>
-          <div class="view-switch" aria-label="Widok planu">
-            <button
-              [class.selected]="view() === 'calendar'"
-              [attr.aria-pressed]="view() === 'calendar'"
-              (click)="view.set('calendar')"
-            >
-              <app-icon name="calendar" />Kalendarz</button
-            ><button
-              [class.selected]="view() === 'list'"
-              [attr.aria-pressed]="view() === 'list'"
-              (click)="view.set('list')"
-            >
-              <app-icon name="list" />Lista
+          <div class="weekend-arrows">
+            <button mat-icon-button (click)="moveWeekend(-1)" aria-label="Poprzedni zjazd">
+              <app-icon name="left" /></button
+            ><button mat-icon-button (click)="moveWeekend(1)" aria-label="Następny zjazd">
+              <app-icon name="right" />
             </button>
           </div>
         </div>
-
-        <div class="calendar-subbar">
-          <div class="filter-buttons" aria-label="Rodzaj zajęć">
-            @for (type of ['all', 'Wykład', 'Ćwiczenia', 'Laboratorium']; track type) {
-              <button
-                [class.selected]="filter() === type"
-                [attr.aria-pressed]="filter() === type"
-                (click)="setFilter(type)"
-              >
-                @if (type !== 'all') {
-                  <i
-                    [class]="
-                      type === 'Wykład' ? 'lecture' : type === 'Laboratorium' ? 'lab' : 'exercise'
-                    "
-                  ></i>
-                }
-                {{
-                  type === 'all'
-                    ? 'Wszystkie'
-                    : type === 'Wykład'
-                      ? 'Wykłady'
-                      : type === 'Laboratorium'
-                        ? 'Laboratoria'
-                        : type
-                }}
-              </button>
-            }
-          </div>
-          <button
-            mat-button
-            class="export-button"
-            [disabled]="!weekendLessons().length || loading()"
-            (click)="exportCsv()"
-          >
-            <app-icon name="download" />CSV
+        @if (!isNearestWeekend()) {
+          <button class="nearest-button" mat-button (click)="resetWeekend()">
+            <app-icon name="arrow" />Najbliższy zjazd
           </button>
-        </div>
-
-        <div class="mobile-days" aria-label="Wybierz dzień">
-          @for (day of days(); track day.date) {
-            <button
-              [class.selected]="selectedDay() === day.index"
-              [attr.aria-pressed]="selectedDay() === day.index"
-              (click)="selectedDay.set(day.index)"
-            >
-              <strong>{{ day.short }}</strong
-              ><span>{{ dateLabel(day.date, { day: 'numeric', month: 'short' }) }}</span>
-            </button>
-          }
-        </div>
-
-        @if (outsideSemester()) {
-          <div class="info-banner">
-            <app-icon name="info" />Ten weekend jest poza zakresem pobranego semestru.
-          </div>
         }
 
-        <div
-          class="calendar-board"
-          [class.calendar-layout]="view() === 'calendar' && !!schedule()"
-          [style.--timeline-height.px]="timelineHeight()"
-        >
-          <div class="time-axis" aria-hidden="true">
-            <div class="time-axis-label">Godzina</div>
-            <div class="hour-labels">
-              @for (hour of timelineHours(); track hour) {
-                <span [style.top.px]="(hour - timelineStart()) * 64"
-                  >{{ hour.toString().padStart(2, '0') }}:00</span
-                >
-              }
-            </div>
-          </div>
-          <div class="days-grid" [attr.aria-busy]="loading()">
-            @for (day of days(); track day.date) {
-              <section
-                class="day-column"
-                [class.mobile-hidden]="selectedDay() !== day.index"
-                [class.today]="day.date === now().date"
-                [class.focused-day]="selectedDay() === day.index"
-                [attr.aria-label]="day.name + ' ' + day.date"
+        <div class="day-tabs" role="tablist" aria-label="Dzień zjazdu">
+          @for (day of days(); track day.date) {
+            <button
+              role="tab"
+              [id]="'tab-' + day.index"
+              [attr.aria-controls]="'day-' + day.index"
+              [attr.aria-selected]="selectedDay() === day.index"
+              [attr.tabindex]="selectedDay() === day.index ? 0 : -1"
+              [class.selected]="selectedDay() === day.index"
+              (click)="selectedDay.set(day.index)"
+              (keydown)="onDayKey($event, day.index)"
+            >
+              {{ day.short }} {{ dateLabel(day.date, { day: 'numeric' }) }}
+            </button>
+          }
+        </div>
+
+        <div class="schedule-tools">
+          <span class="lesson-count desktop-count">{{ lessonCount(visibleCount()) }}</span
+          ><span class="lesson-count mobile-count">{{ lessonCount(focusedDay().count) }}</span>
+          <div class="filter-tools">
+            <button
+              mat-button
+              class="filter-button"
+              [matMenuTriggerFor]="typeMenu"
+              [class.has-filter]="filter() !== 'all'"
+            >
+              <app-icon name="filter" />{{ filter() === 'all' ? 'Typ zajęć' : filter() }}
+            </button>
+            @if (filter() !== 'all') {
+              <button
+                class="clear-filter"
+                mat-icon-button
+                (click)="setFilter('all')"
+                aria-label="Wyczyść filtr"
               >
-                <header class="day-heading">
-                  <button (click)="selectedDay.set(day.index)">
-                    <span
-                      >{{ day.name }}
-                      @if (day.date === now().date) {
-                        <small>Dzisiaj</small>
-                      }</span
-                    ><strong>{{ dateLabel(day.date, { day: '2-digit' }) }}</strong
-                    ><small>{{ !schedule() ? '–' : day.lessons.length }} zajęć</small>
-                  </button>
-                </header>
-                <div class="day-content">
-                  @if (loading() && !schedule()) {
-                    @for (n of [0, 1, 2]; track n) {
-                      <div class="lesson-skeleton">
-                        <div class="skeleton"></div>
-                        <div class="skeleton short"></div>
-                      </div>
-                    }
-                  } @else if (!schedule()) {
-                    <div class="empty-day">
-                      <app-icon name="info" /><strong>Plan niedostępny</strong
-                      ><span>Spróbuj ponownie pobrać dane.</span>
-                    </div>
-                  } @else {
-                    @for (lesson of day.lessons; track lesson.id; let index = $index) {
-                      @if (index > 0 && gap(day.lessons[index - 1], lesson) > 0) {
-                        <div class="break-separator">
-                          <span></span><app-icon name="coffee" />{{
-                            gap(day.lessons[index - 1], lesson)
-                          }}
-                          min przerwy<span></span>
-                        </div>
-                      }
-                      <button
-                        [class]="'lesson-card ' + typeClass(lesson)"
-                        [class.active]="active(lesson)"
-                        [class.past]="past(lesson)"
-                        [class.canceled]="lesson.canceled"
-                        [style.--event-top.px]="eventTop(lesson)"
-                        [style.--event-height.px]="eventHeight(lesson)"
-                        (click)="showDetails(lesson)"
-                        [attr.aria-label]="
-                          lesson.title +
-                          ', ' +
-                          lesson.start +
-                          '–' +
-                          lesson.end +
-                          ', ' +
-                          lesson.location +
-                          '. Pokaż szczegóły'
-                        "
-                      >
-                        <span class="lesson-time"
-                          ><span>{{ lesson.start }}–{{ lesson.end }}</span>
-                          @if (active(lesson)) {
-                            <span class="ongoing"><i></i> Trwają</span>
-                          } @else {
-                            <span class="duration">{{ duration(lesson) }}</span>
-                          }
-                        </span>
-                        <strong class="lesson-title">{{ lesson.title }}</strong>
-                        <span class="lesson-tags"
-                          ><span class="type-tag"><i></i>{{ lesson.type }}</span
-                          ><span class="group-tag">{{
-                            lesson.group === 'all' ? 'Wspólny' : 'Gr. ' + lesson.group
-                          }}</span>
-                          @if (lesson.canceled) {
-                            <span class="cancel-tag">Odwołane</span>
-                          }
-                        </span>
-                        <span class="lesson-location"
-                          ><app-icon [name]="lesson.online ? 'video' : 'pin'" />{{ room(lesson)
-                          }}<app-icon class="card-arrow" name="arrow" /></span
-                        ><span class="lesson-teacher"
-                          ><app-icon name="user" />{{ lesson.teacher }}</span
-                        >
-                      </button>
-                    } @empty {
-                      <div class="empty-day">
-                        <app-icon [name]="query() ? 'search' : 'leaf'" /><strong>{{
-                          outsideSemester()
-                            ? 'Poza zakresem planu'
-                            : query()
-                              ? 'Brak wyników'
-                              : filter() === 'all'
-                                ? 'Dzień wolny'
-                                : 'Brak zajęć tego typu'
-                        }}</strong
-                        ><span>{{
-                          query() ? 'Spróbuj innej nazwy lub sali.' : 'Trochę czasu dla siebie.'
-                        }}</span>
-                      </div>
-                    }
-                  }
-                </div>
-              </section>
+                <app-icon name="close" />
+              </button>
             }
           </div>
         </div>
-        <footer class="calendar-footer">
-          <span>Semestr zimowy 2026/27 <i>·</i> Europe/Warsaw</span
-          ><span>{{ weekendLessons().length }} zajęć <i>·</i> {{ totalHours() }} godz.</span>
-        </footer>
+        <mat-menu #typeMenu="matMenu">
+          <button mat-menu-item (click)="setFilter('all')">
+            <app-icon [name]="filter() === 'all' ? 'check' : 'list'" /><span>Wszystkie typy</span>
+          </button>
+          @for (type of filterTypes; track type) {
+            <button mat-menu-item (click)="setFilter(type)">
+              <app-icon [name]="filter() === type ? 'check' : 'book'" /><span>{{ type }}</span>
+            </button>
+          }
+        </mat-menu>
+
+        <div class="calendar-board">
+          @for (day of days(); track day.date) {
+            <section
+              class="day-column"
+              [class.mobile-hidden]="selectedDay() !== day.index"
+              [id]="'day-' + day.index"
+              [attr.aria-label]="
+                day.name + ', ' + dateLabel(day.date, { day: 'numeric', month: 'long' })
+              "
+            >
+              <div class="day-heading">
+                <h3>
+                  {{ day.name }} <span>{{ dateLabel(day.date, { day: 'numeric' }) }}</span>
+                </h3>
+                <span>{{ lessonCount(day.count) }}</span>
+              </div>
+              <div class="day-content">
+                @for (block of day.blocks; track block.id; let index = $index) {
+                  @if (index > 0 && gap(day.blocks[index - 1], block) > 0) {
+                    <div class="break-row">
+                      <app-icon name="coffee" />{{ gap(day.blocks[index - 1], block) }} min przerwy
+                    </div>
+                  }
+                  <app-lesson-card [block]="block" [now]="now()" />
+                } @empty {
+                  <div class="empty-day">
+                    <app-icon [name]="error() && !schedule() ? 'alert' : 'calendar'" /><strong>{{
+                      loading() && !schedule()
+                        ? 'Pobieramy plan…'
+                        : !schedule()
+                          ? 'Plan niedostępny'
+                          : outsideSemester()
+                            ? 'Poza zakresem semestru'
+                            : filter() !== 'all'
+                              ? 'Brak zajęć tego typu'
+                              : 'Dzień bez zajęć'
+                    }}</strong>
+                    <p>
+                      {{
+                        !schedule()
+                          ? 'Plan pojawi się po poprawnym pobraniu danych.'
+                          : filter() !== 'all'
+                            ? 'Wyczyść filtr, aby zobaczyć cały dzień.'
+                            : 'Wybierz inny dzień lub kolejny zjazd.'
+                      }}
+                    </p>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+        </div>
       </section>
     </main>
-
-    <footer class="page-footer">
-      <span>{{
-        staticSchedule ? 'Plan synchronizowany co 3 godziny.' : 'Twój plan. Spokojna głowa.'
-      }}</span>
-      <div class="sync-status">
-        <span class="status-dot" [class.warning]="stale()"></span
-        ><span>{{
+    <footer>
+      <span class="sync-status" [class.syncing]="loading()"
+        ><app-icon [name]="loading() ? 'refresh' : stale() ? 'alert' : 'check'" />{{
           loading()
-            ? 'Pobieranie z IDEIS…'
+            ? 'Pobieranie planu…'
             : schedule()
-              ? (stale() ? 'Zapisana kopia · ' : 'Zaktualizowano · ') + syncLabel()
-              : 'Brak połączenia z planem'
+              ? (stale() ? 'Zapisana kopia · ' : 'Zaktualizowano ') + syncLabel()
+              : 'Oczekiwanie na dane'
         }}</span
-        ><button
-          mat-icon-button
-          (click)="load()"
-          [disabled]="loading()"
-          aria-label="Odśwież plan"
-          [matTooltip]="
-            staticSchedule ? 'Wczytaj ostatni opublikowany plan' : 'Pobierz aktualny plan z IDEIS'
-          "
-        >
-          <app-icon name="refresh" /></button
-        ><a [href]="source" target="_blank" rel="noopener">IDEIS<app-icon name="external" /></a>
-      </div>
+      ><a [href]="source" target="_blank" rel="noopener noreferrer"
+        >Źródło: IDEIS<app-icon name="external"
+      /></a>
     </footer>
-  </div>
+  } @else {
+    <main class="group-welcome">
+      <div class="welcome-icon"><app-icon name="calendar" /></div>
+      <h1>Twój plan zajęć</h1>
+      <p>
+        Wybierz grupę, aby zobaczyć swój plan. Dodamy do niego ćwiczenia grupy 1 i wykłady wspólne.
+      </p>
+      <div class="group-options">
+        <button mat-stroked-button (click)="chooseGroup('1A')" data-group-choice="1A">
+          Grupa 1A</button
+        ><button mat-stroked-button (click)="chooseGroup('1B')" data-group-choice="1B">
+          Grupa 1B
+        </button>
+      </div>
+      <p class="welcome-hint">
+        Zapamiętamy wybór w tej przeglądarce. Grupę możesz zmienić w prawym górnym rogu.
+      </p>
+    </main>
+  }
 </div>

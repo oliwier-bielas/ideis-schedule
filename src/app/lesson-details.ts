@@ -3,9 +3,11 @@ import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { Icon } from './icon';
 import { Lesson } from './schedule';
+import { findCampusBuilding } from './campus-location';
+import { LessonMap } from './lesson-map';
 @Component({
   selector: 'app-lesson-details',
-  imports: [MatDialogModule, MatButtonModule, Icon],
+  imports: [MatDialogModule, MatButtonModule, Icon, LessonMap],
   template: ` <div class="detail-heading">
       <span class="eyebrow">SZCZEGÓŁY ZAJĘĆ</span
       ><button mat-icon-button mat-dialog-close aria-label="Zamknij szczegóły">
@@ -40,6 +42,9 @@ import { Lesson } from './schedule';
             <small>Sala i budynek</small><strong>{{ lesson.location }}</strong>
           </div>
         </div>
+        @if (building) {
+          <app-lesson-map [building]="building" />
+        }
         <div class="detail-row">
           <app-icon name="user" />
           <div>
@@ -67,6 +72,7 @@ import { Lesson } from './schedule';
 })
 export class LessonDetails {
   readonly lesson = inject<Lesson>(MAT_DIALOG_DATA);
+  readonly building = findCampusBuilding(this.lesson);
   readonly date = new Intl.DateTimeFormat('pl-PL', {
     weekday: 'long',
     day: 'numeric',

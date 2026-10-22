@@ -4,7 +4,7 @@ Jednostronicowa aplikacja Angular 22 + Angular Material dla studentów fizjotera
 
 ## GitHub Pages — publikacja i synchronizacja co 3 godziny
 
-Wersja Pages działa bez własnego serwera. Workflow `.github/workflows/pages.yml` uruchamia Puppeteer na GitHub Actions, pobiera cały semestr, filtruje grupy **1, 1A i wykłady wspólne**, zapisuje JSON i publikuje gotowego Angulara wraz z planem.
+Wersja Pages działa bez własnego serwera. Workflow `.github/workflows/pages.yml` uruchamia Puppeteer na GitHub Actions, pobiera cały semestr, zachowuje grupy **1, 1A, 1B i wykłady wspólne**, zapisuje JSON i publikuje gotowego Angulara wraz z planem. Aplikacja pokazuje zajęcia wybranej podgrupy 1A albo 1B wraz ze wspólnymi ćwiczeniami grupy 1 i wykładami.
 
 ### Jednorazowe uruchomienie na GitHubie
 
@@ -50,7 +50,7 @@ npm run build:pages
 npm run preview:pages
 ```
 
-Gdy podgląd działa, `node server/verify-browser.mjs --pages` sprawdza również statyczny JSON i link do strony głównej pod ścieżką repozytorium. Skrypt pełnej weryfikacji interfejsu korzysta z bieżącego weekendu, więc wymaga weekendu z zajęciami w pobranym semestrze.
+Gdy podgląd działa, `node server/verify-browser.mjs --pages` sprawdza również statyczny JSON i link do strony głównej pod ścieżką repozytorium. Skrypt ustawia zegar testowy w obrębie rzeczywistego semestru i sprawdza zjazd 23–25 października 2026.
 
 ## Uruchomienie
 
@@ -75,33 +75,36 @@ Można też ustawić `PUPPETEER_EXECUTABLE_PATH` na istniejącą instalację Chr
 
 W wersji lokalnej każde otwarcie aplikacji wywołuje `GET /api/schedule`. W wersji Pages przeglądarka odczytuje względny adres `data/schedule.json`, przygotowywany co 3 godziny przez Actions. W obu trybach ten sam scraper otwiera publiczną stronę w Puppeteer, odczytuje zakres opcji „Cały semestr”, ustawia daty w kontrolkach DevExpress i wywołuje oryginalne wyszukiwanie `FiltrujDane`. Czeka na `EndCallback`, po czym odczytuje wszystkie wiersze tabeli, łącznie z datami grupującymi, salami, prowadzącymi i uwagami. Równoległe żądania lokalnego backendu współdzielą jedno trwające pobranie.
 
-Filtr działa **na backendzie, przed wysłaniem danych do przeglądarki**:
+Backend odrzuca obce grupy przed wysłaniem danych do przeglądarki. Przeglądarka następnie wybiera podgrupę zapisaną przez użytkownika:
 
 | Oznaczenie w IDEIS                | Widok aplikacji                                    |
 | --------------------------------- | -------------------------------------------------- |
 | `Fizjoterapia Jmgr 1sem Ćw1N`     | Ćwiczenia, grupa 1                                 |
 | `Fizjoterapia Jmgr 1sem Labor1AN` | Laboratoria, grupa 1A                              |
-| `Fizjoterapia Jmgr 1sem WykN`     | Wykłady wspólne, obowiązujące również grupy 1 i 1A |
+| `Fizjoterapia Jmgr 1sem Labor1BN` | Laboratoria, grupa 1B                              |
+| `Fizjoterapia Jmgr 1sem WykN`     | Wykłady wspólne dla obu podgrup |
 
-Grupy `Ćw2N`, `Labor1BN`, `Labor2AN`, `Labor2BN` i nierozpoznane oznaczenia są odrzucane. Dopasowanie obejmuje cały token grupy, więc „1” nie przepuszcza „10”, „1B” ani „2A”. Frontend dodatkowo sprawdza dozwolone oznaczenia odpowiedzi.
+Grupy `Ćw2N`, `Labor2AN`, `Labor2BN` i nierozpoznane oznaczenia są odrzucane. Dopasowanie obejmuje cały token grupy, więc nie przepuszcza „10” ani „2A”. Frontend sprawdza dozwolone oznaczenia odpowiedzi i odrzuca niepełną kopię bez danych jednej z podgrup. Synchronizacja nadal odbywa się co 3 godziny i dostarcza dane obu podgrup w jednym pliku.
 
 ### Ustalenia dotyczące źródła
 
-- Pobieranie rzeczywistego planu zostało sprawdzone **22 października 2026**: 164 zajęcia po filtrowaniu, semestr od 11.09.2026 do 07.02.2027. Weekend 23–25 października obejmował 11 zajęć. Liczby mogą zmieniać się wraz z aktualizacjami źródła.
+- Pobieranie rzeczywistego planu zostało sprawdzone **22 października 2026**: 200 bloków po filtrowaniu (56 wykładów wspólnych, 72 ćwiczenia grupy 1 oraz po 36 laboratoriów grup 1A i 1B), semestr od 11.09.2026 do 07.02.2027. Każda z podgrup widzi 164 bloki w semestrze, w tym 11 w weekend 23–25 października. Liczby mogą zmieniać się wraz z aktualizacjami źródła.
 - Handler przycisku „Cały semestr” w IDEIS rozdziela wartość po dwóch ukośnikach wstecznych, podczas gdy HTML zawiera pojedyncze. Bez obejścia daty pozostały na bieżącym dniu i wynik był pusty. Scraper odczytuje zakres bezpośrednio z HTML i ustawia daty przez API kontrolek `MVCxDataOd` / `MVCxDataDo`.
 - Zweryfikowano również publiczny eksport `WydrukTokuCsv/1516`. Eksport pomija **prowadzących i formę zajęć** oraz nie zachowuje poprawnie części polskich znaków, dlatego źródłem pełnych danych aplikacji jest tabela odczytywana przez Puppeteer. Przycisk „Eksportuj CSV” generuje UTF-8 z BOM z przefiltrowanego weekendu, z prowadzącymi i salami.
 - Brak nierozwiązanych przeszkód w pobieraniu podczas weryfikacji. Integracja zależy od publicznej strony i jej struktury. Zmiana selektorów lub kolumn powoduje czytelny błąd z nazwą etapu, zamiast udawać dzień wolny.
 
 ## Zachowanie interfejsu
 
-- Ciemny motyw, miętowy akcent, komponenty i dialogi Angular Material, własne spójne ikony SVG. Uporządkowany układ z wąską nawigacją, boczną agendą i dużym kalendarzem.
-- Bieżące zajęcia, postęp, czas do końca, następne zajęcia i przerwy. Status aktualizuje się co 15 sekund według strefy `Europe/Warsaw`, niezależnie od strefy komputera.
-- Domyślnie nadchodzący weekend od poniedziałku do czwartku; bieżący od piątku do niedzieli. Nawigacja weekendu nie zmienia rzeczywistego statusu na górze.
-- Kalendarz trzech dni z osią godzin i blokami proporcjonalnymi do długości zajęć; opcjonalny widok listy. Boczna agenda pokazuje wybrany dzień, wyszukiwanie obejmuje przedmioty, prowadzących i sale. Na telefonie jeden dzień i zakładki Pt / Sob / Nd. Domyślnie dzisiejszy dzień lub pierwszy dzień z zajęciami.
-- Filtry rodzaju zajęć, wyróżnienie aktualnych i zakończonych pozycji, jawne oznaczenia zajęć zdalnych i odwołanych.
-- Szczegóły w bocznym panelu na komputerze i dolnym panelu na telefonie; Escape zamyka panel i przywraca fokus. Zachowane miejsce przewinięcia.
+- Neutralny grafit: tło `#101217`, karty `#191C23`, aktywne zakładki `#272C36`; pastelowy kolor przypisany na stałe do nazwy przedmiotu. Psychologia jest lawendowa, dietetyka szałwiowa, anatomia błękitna. Ten sam przedmiot zachowuje kolor we wszystkich terminach, formach zajęć i filtrach. Pozostałe przedmioty mają deterministyczne przypisanie z tej samej palety.
+- Przy pierwszym wejściu ekran wyboru grupy 1A / 1B. Wybór trafia do `localStorage` pod kluczem `fizjoplan:group:v1`, a przy następnym wejściu jest odczytywany przed pokazaniem planu. Brakujący lub nieprawidłowy wybór ponownie pokazuje ekran wyboru. W nagłówku po prawej jest select do zmiany grupy; aktualizuje listę, liczniki, status i eksport CSV. Obie grupy zachowują ćwiczenia grupy 1 i wykłady wspólne. Przy zablokowanym zapisie wybór działa na czas otwartej strony, z informacją o braku możliwości zapamiętania.
+- Lekki nagłówek FizjoPlan i kompaktowa karta najbliższych zajęć z datą podaną raz. Podczas zajęć pokazuje „Trwa teraz”, pozostałe minuty i pasek postępu. Stan aktualizuje się co 15 sekund według strefy `Europe/Warsaw`, niezależnie od strefy komputera.
+- Jedna nawigacja zjazdu: zakres i strzałki, a na telefonie równe zakładki Pt / Sob / Ndz. Domyślnie nadchodzący weekend od poniedziałku do czwartku, bieżący od piątku do niedzieli. „Najbliższy zjazd” pojawia się przy przeglądaniu innych terminów. Nawigacja nie zmienia rzeczywistego statusu na górze.
+- Na komputerze trzy kolumny dni; na telefonie jeden wybrany dzień, marginesy 16 px, odstępy 12 px i karty bez zewnętrznej ramki. Domyślnie dzisiejszy dzień lub pierwszy dzień z zajęciami. Zakładki obsługują strzałki, Home i End.
+- Filtr „Typ zajęć” korzysta z menu Angular Material; wybrany typ można wyczyścić bez zmiany dnia. Eksport całego zjazdu do CSV, odświeżenie i link do IDEIS są w menu dodatkowych akcji obok tytułu.
+- Kliknięcie karty rozwija szczegóły w miejscu: prowadzącego, czas trwania, grupę, bloki godzinowe, zaliczenie, uwagi i mapę. Kolejne bloki tego samego przedmiotu, prowadzącego, formy, grupy i miejsca łączą się w jedną kartę. Rozwinięcie pokazuje osobno „Blok 1”, przerwę i „Blok 2” z oryginalnymi godzinami. Przerwa nie wlicza się do czasu zajęć ani statusu „Trwa teraz”. Łączenie odbywa się przed filtrowaniem, bez zmiany danych eksportu CSV. Zajęcia zdalne i odwołane mają jawne oznaczenia.
+- W szczegółach zajęć dla S55 (Gmach Główny, ul. Strzegomska 55), S47 (ul. Strzegomska 47) i W1 (ul. Wagonowa 1) jest klikalna mapka oraz przycisk „Nawiguj w Google Maps”. Wszystkie adresy we Wrocławiu. Podgląd pochodzi z OpenStreetMap, a nawigacja korzysta z [uniwersalnych linków Google Maps](https://developers.google.com/maps/documentation/urls/get-started) bez klucza API. Celem trasy są zweryfikowane współrzędne konkretnego budynku, ponieważ Google potrafi rozpoznać adres tekstowy jako samą ulicę i pominąć numer. Pełny adres pozostaje widoczny w aplikacji. Na telefonie link otwiera aplikację Google Maps, jeśli jest zainstalowana; inaczej mapy w przeglądarce. Google Maps korzysta z pozycji urządzenia, a przy jej braku pokazuje podgląd trasy. Zajęcia zdalne i nierozpoznane lub niejednoznaczne budynki nie otrzymują mapy ani zgadywanego adresu.
 - Osobne stany ładowania, błędu, pustego dnia, braku zajęć wybranego typu i weekendu poza semestrem.
-- Po błędzie pobrania można wyświetlić ostatnią poprawną kopię z `localStorage`; banner wyraźnie informuje o możliwej nieaktualności i dacie pobrania. Kopia nigdy nie zastępuje próby odświeżenia przy otwarciu strony.
+- Po błędzie pobrania można wyświetlić ostatnią poprawną kopię z `localStorage` (`fizjoplan:schedule:v2`); banner wyraźnie informuje o możliwej nieaktualności i dacie pobrania. Kopia obejmuje obie podgrupy i nadal jest filtrowana według wyboru użytkownika. Stara kopia v1 zawierająca tylko 1A nie jest używana jako plan 1B. Kopia nigdy nie zastępuje próby odświeżenia przy otwarciu strony.
 - Nawigacja klawiaturą, etykiety przycisków, focus, ograniczone animacje przy `prefers-reduced-motion`. Font Inter z Google Fonts ma lokalny fallback systemowy.
 
 ## Testy i kompilacja
@@ -112,7 +115,7 @@ npm run test:server
 npm run build
 ```
 
-Testy obejmują odrzucanie innych grup, normalizację rzeczywistych kolumn IDEIS, odwołane i zdalne zajęcia, granice godzin, statusy dnia, wybór weekendu i zmianę czasu w Warszawie.
+Testy obejmują odrzucanie innych grup, rozdzielenie planu 1A i 1B, zapis i odczyt wyboru, błędny lub zablokowany storage, normalizację rzeczywistych kolumn IDEIS, odwołane i zdalne zajęcia, granice godzin, statusy dnia, wybór weekendu i zmianę czasu w Warszawie. Testy prezentacji sprawdzają stałość kolorów, łączenie bloków, zachowanie oryginalnych godzin i rozróżnienie przerwy od zajęć.
 
 Po uruchomieniu `npm start` można dodatkowo uruchomić:
 
@@ -120,7 +123,7 @@ Po uruchomieniu `npm start` można dodatkowo uruchomić:
 node server/verify-browser.mjs
 ```
 
-Test Puppeteer pobiera rzeczywisty plan przez aplikację, sprawdza szczegóły, nawigację, widoki 390 i 320 px bez poziomego przewijania oraz błąd z zapisaną kopią i bez niej. Zrzuty i pobrane dane testowe trafiają do ignorowanego `tmp/`. Opcja `--cached` używa wyłącznie wcześniej pobranego, rzeczywistego `tmp/verified-schedule.json`, aby powtórzyć weryfikację wyglądu bez dodatkowych zapytań do IDEIS.
+Test Puppeteer pobiera rzeczywisty plan przez aplikację, sprawdza pierwsze wejście, zapamiętanie grupy po przeładowaniu, select, rozdzielenie eksportów A/B, rozwijanie bloków i przerw, stałość kolorów, filtry, mapy, status trwających zajęć dla wybranej grupy, nawigację, widoki 390 i 320 px bez poziomego przewijania oraz błąd z zapisaną kopią i bez niej. Zegar testowy jest ustawiany na 22–24 października 2026, w obrębie rzeczywistego semestru. Zrzuty i pobrane dane testowe trafiają do ignorowanego `tmp/`. Opcja `--cached` używa wyłącznie wcześniej pobranego, rzeczywistego `tmp/verified-schedule.json`, aby powtórzyć weryfikację wyglądu bez dodatkowych zapytań do IDEIS.
 
 ## Wersja produkcyjna lokalnie
 
@@ -129,4 +132,4 @@ npm run build
 npm run start:prod
 ```
 
-Standardowy build (bez konfiguracji Pages) działa z lokalnym backendem, który serwuje aplikację oraz API pod **http://127.0.0.1:3001/**. Port można zmienić przez `PORT`. Statyczny hosting wykorzystuje osobne `npm run build:pages` i workflow opisany na początku dokumentu. Projekt jest przygotowany do publikacji; nie został jeszcze przesłany ani wdrożony na koncie GitHub.
+Standardowy build (bez konfiguracji Pages) działa z lokalnym backendem, który serwuje aplikację oraz API pod **http://127.0.0.1:3001/**. Port można zmienić przez `PORT`. Statyczny hosting wykorzystuje osobne `npm run build:pages` i workflow opisany na początku dokumentu. Zmiany w projekcie są przygotowane lokalnie; publikacja na GitHubie wymaga przesłania ich do repozytorium.

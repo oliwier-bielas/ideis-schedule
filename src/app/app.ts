@@ -1,14 +1,20 @@
-import { Component, computed, inject, OnDestroy, signal } from '@angular/core';
+import { Component, computed, OnDestroy, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatDialog } from '@angular/material/dialog';
+import { MatMenuModule } from '@angular/material/menu';
 import { Icon } from './icon';
-import { LessonDetails } from './lesson-details';
+import { LessonCard } from './lesson-card';
+import { groupLessonBlocks, LessonBlock, subjectPalette } from './lesson-presentation';
 import { environment } from '../environments/environment';
 import {
+  lessonsForGroup,
+  parseSubgroup,
+  readSavedGroup,
+  saveGroup,
+  SCHEDULE_STORAGE_KEY,
+} from './group-selection';
+import {
   defaultWeekend,
-  isActive,
   Lesson,
   liveStatus,
   minutes,
@@ -19,12 +25,13 @@ import {
 
 @Component({
   selector: 'app-root',
-  imports: [MatButtonModule, MatTooltipModule, MatProgressBarModule, Icon],
+  imports: [MatButtonModule, MatProgressBarModule, MatMenuModule, Icon, LessonCard],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App implements OnDestroy {
-  private readonly dialog = inject(MatDialog);
+  readonly selectedGroup = signal(readSavedGroup());
+  readonly preferenceSaved = signal(true);
   readonly now = signal(warsawNow());
   readonly schedule = signal<Schedule | null>(null);
   readonly loading = signal(true);
@@ -33,33 +40,33 @@ export class App implements OnDestroy {
   readonly weekend = signal(defaultWeekend(this.now().date));
   readonly selectedDay = signal(0);
   readonly filter = signal('all');
-  readonly query = signal('');
-  readonly view = signal<'calendar' | 'list'>('calendar');
+  readonly filterTypes = ['Wykład', 'Ćwiczenia', 'Laboratorium'];
   readonly source = 'https://harmonogramy.ideis.pl/Plany/PlanyTokow/1516';
   readonly staticSchedule = environment.staticSchedule;
   private timer = setInterval(() => this.now.set(warsawNow()), 15_000);
   private controller?: AbortController;
   private destroyed = false;
-  readonly lessons = computed(() => this.schedule()?.lessons ?? []);
+  readonly lessons = computed(() =>
+    lessonsForGroup(this.schedule()?.lessons ?? [], this.selectedGroup()),
+  );
   readonly live = computed(() => liveStatus(this.lessons(), this.now()));
   readonly featured = computed(() => this.live().current ?? this.live().next);
+  readonly featuredPalette = computed(() => subjectPalette(this.featured()?.title ?? ''));
+  readonly isNearestWeekend = computed(() => this.weekend() === defaultWeekend(this.now().date));
   readonly days = computed(() =>
     [0, 1, 2].map((index) => {
       const date = shiftDate(this.weekend(), index);
-      const lessons = this.lessons().filter(
-        (l) =>
-          l.date === date &&
-          (this.filter() === 'all' || l.type === this.filter()) &&
-          `${l.title} ${l.teacher} ${l.location}`
-            .toLocaleLowerCase('pl-PL')
-            .includes(this.query().toLocaleLowerCase('pl-PL').trim()),
+      const blocks = groupLessonBlocks(this.lessons().filter((l) => l.date === date));
+      const filtered = blocks.filter(
+        (block) => this.filter() === 'all' || block.lesson.type === this.filter(),
       );
       return {
         date,
         index,
         name: ['Piątek', 'Sobota', 'Niedziela'][index],
-        short: ['Pt', 'Sob', 'Nd'][index],
-        lessons,
+        short: ['Pt', 'Sob', 'Ndz'][index],
+        blocks: filtered,
+        count: filtered.reduce((sum, block) => sum + block.slots.length, 0),
       };
     }),
   );
@@ -68,61 +75,27 @@ export class App implements OnDestroy {
       (l) => l.date >= this.weekend() && l.date <= shiftDate(this.weekend(), 2) && !l.canceled,
     ),
   );
-  readonly totalHours = computed(() =>
-    new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 }).format(
-      this.weekendLessons().reduce((sum, l) => sum + minutes(l.end) - minutes(l.start), 0) / 60,
-    ),
-  );
-  readonly dayCount = computed(() => new Set(this.weekendLessons().map((l) => l.date)).size);
+  readonly visibleCount = computed(() => this.days().reduce((sum, day) => sum + day.count, 0));
   readonly focusedDay = computed(() => this.days()[this.selectedDay()]);
-  readonly timelineStart = computed(() =>
-    Math.min(8, ...this.weekendLessons().map((l) => Math.floor(minutes(l.start) / 60))),
-  );
-  readonly timelineEnd = computed(() =>
-    Math.max(20, ...this.weekendLessons().map((l) => Math.ceil(minutes(l.end) / 60))),
-  );
-  readonly timelineHours = computed(() =>
-    Array.from(
-      { length: this.timelineEnd() - this.timelineStart() + 1 },
-      (_, i) => this.timelineStart() + i,
-    ),
-  );
-  readonly timelineHeight = computed(() => (this.timelineEnd() - this.timelineStart()) * 64);
-  eventTop(lesson: Lesson) {
-    return ((minutes(lesson.start) - this.timelineStart() * 60) / 60) * 64;
-  }
-  eventHeight(lesson: Lesson) {
-    return Math.max(50, ((minutes(lesson.end) - minutes(lesson.start)) / 60) * 64 - 4);
-  }
   readonly progress = computed(() => {
     const l = this.live().current;
     return l
       ? ((minutes(this.now().time) - minutes(l.start)) / (minutes(l.end) - minutes(l.start))) * 100
       : 0;
   });
-  readonly statusHeading = computed(() => {
-    const live = this.live();
-    if (live.current) return 'Jesteś we właściwym miejscu.';
-    if (live.state === 'break') return 'Chwila oddechu między zajęciami.';
-    if (live.state === 'before') return `Zaczynasz dziś o ${live.next!.start}.`;
-    if (live.state === 'finished') return 'Na dziś koniec zajęć.';
-    if (live.next) return 'Przed Tobą kolejny zjazd.';
-    return 'Dziś możesz złapać oddech.';
-  });
   readonly remaining = computed(() => {
     const live = this.live();
-    if (live.current) return `Do końca ${minutes(live.current.end) - minutes(this.now().time)} min`;
+    if (live.current)
+      return `Pozostało ${minutes(live.current.end) - minutes(this.now().time)} min`;
     if (live.next?.date === this.now().date)
       return `Za ${minutes(live.next.start) - minutes(this.now().time)} min`;
-    return live.next
-      ? `${this.dateLabel(live.next.date, { weekday: 'long', day: 'numeric', month: 'long' })}, ${live.next.start}`
-      : 'Czas dla Ciebie';
+    return '';
   });
   readonly weekendLabel = computed(() => {
     const end = shiftDate(this.weekend(), 2);
     return this.weekend().slice(0, 7) === end.slice(0, 7)
-      ? `${this.dateLabel(this.weekend(), { day: 'numeric' })}–${this.dateLabel(end, { day: 'numeric', month: 'long', year: 'numeric' })}`
-      : `${this.dateLabel(this.weekend(), { day: 'numeric', month: 'long' })} – ${this.dateLabel(end, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      ? `${this.dateLabel(this.weekend(), { day: 'numeric' })}–${this.dateLabel(end, { day: 'numeric', month: 'long' })}`
+      : `${this.dateLabel(this.weekend(), { day: 'numeric', month: 'long' })} – ${this.dateLabel(end, { day: 'numeric', month: 'long' })}`;
   });
   readonly outsideSemester = computed(
     () =>
@@ -155,7 +128,7 @@ export class App implements OnDestroy {
       this.acceptSchedule(data);
       this.stale.set(false);
       try {
-        localStorage.setItem('fizjoplan:schedule:v1', JSON.stringify(data));
+        localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(data));
       } catch {
         /* Storage is optional. */
       }
@@ -168,7 +141,7 @@ export class App implements OnDestroy {
       );
       if (!this.schedule()) {
         try {
-          const saved = localStorage.getItem('fizjoplan:schedule:v1');
+          const saved = localStorage.getItem(SCHEDULE_STORAGE_KEY);
           if (saved) this.acceptSchedule(JSON.parse(saved));
         } catch {
           /* No valid offline copy. */
@@ -187,13 +160,17 @@ export class App implements OnDestroy {
     if (
       data.lessons.some(
         (l) =>
-          !['1', '1A', 'all'].includes(l.group) ||
+          !['1', '1A', '1B', 'all'].includes(l.group) ||
           !/^\d{4}-\d{2}-\d{2}$/.test(l.date) ||
           !/^\d{2}:\d{2}$/.test(l.start) ||
           !/^\d{2}:\d{2}$/.test(l.end),
       )
     )
       throw new Error('Odpowiedź zawiera nierozpoznaną grupę lub format zajęć.');
+    if (!['1A', '1B'].every((group) => data.lessons.some((lesson) => lesson.group === group)))
+      throw new Error(
+        'Plan nie zawiera danych obu grup 1A i 1B. Wymagana jest ponowna synchronizacja.',
+      );
     this.schedule.set(data);
     this.pickDefaultDay();
   }
@@ -224,55 +201,58 @@ export class App implements OnDestroy {
   }
   private pickDefaultDay() {
     const today = this.days().find((d) => d.date === this.now().date);
-    this.selectedDay.set(today?.index ?? this.days().find((d) => d.lessons.length)?.index ?? 0);
+    this.selectedDay.set(today?.index ?? this.days().find((d) => d.count)?.index ?? 0);
   }
   setFilter(value: string) {
     this.filter.set(value);
-    this.pickDefaultDay();
   }
-  active(lesson: Lesson) {
-    return isActive(lesson, this.now());
+  chooseGroup(value: unknown) {
+    const group = parseSubgroup(value);
+    if (!group) return;
+    const firstChoice = !this.selectedGroup();
+    this.selectedGroup.set(group);
+    this.preferenceSaved.set(saveGroup(group));
+    if (firstChoice) this.pickDefaultDay();
   }
-  past(lesson: Lesson) {
-    return `${lesson.date} ${lesson.end}` <= `${this.now().date} ${this.now().time}`;
-  }
-  gap(previous: Lesson, next: Lesson) {
-    return Math.max(0, minutes(next.start) - minutes(previous.end));
-  }
-  duration(lesson: Lesson) {
-    const m = minutes(lesson.end) - minutes(lesson.start);
-    return m >= 60
-      ? `${Math.floor(m / 60)} godz.${m % 60 ? ' ' + (m % 60) + ' min' : ''}`
-      : `${m} min`;
+  onDayKey(event: KeyboardEvent, index: number) {
+    let next: number;
+    if (event.key === 'ArrowRight') next = (index + 1) % 3;
+    else if (event.key === 'ArrowLeft') next = (index + 2) % 3;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = 2;
+    else return;
+    event.preventDefault();
+    this.selectedDay.set(next);
+    document.getElementById(`tab-${next}`)?.focus();
   }
   room(lesson: Lesson) {
-    return lesson.location.split(' - ')[0];
+    return lesson.online ? 'Zajęcia online' : lesson.location.split(' - ')[0];
   }
-  typeClass(lesson: Lesson) {
-    return lesson.type === 'Wykład'
-      ? 'lecture'
-      : lesson.type === 'Laboratorium'
-        ? 'lab'
-        : 'exercise';
+  gap(previous: LessonBlock, next: LessonBlock) {
+    if (previous.lesson.canceled || next.lesson.canceled) return 0;
+    // A hidden class is not a break when a type filter is active.
+    if (
+      this.lessons().some(
+        (lesson) =>
+          !lesson.canceled &&
+          lesson.date === previous.lesson.date &&
+          lesson.start < next.start &&
+          lesson.end > previous.end,
+      )
+    )
+      return 0;
+    return Math.max(0, minutes(next.start) - minutes(previous.end));
   }
-  nextGap() {
-    const { current, next } = this.live();
-    return current && next?.date === current.date ? this.gap(current, next) : 0;
+  relativeDate(date: string) {
+    if (date === this.now().date) return 'Dzisiaj';
+    if (date === shiftDate(this.now().date, 1)) return 'Jutro';
+    return this.dateLabel(date, { day: 'numeric', month: 'long' });
   }
-  showDetails(lesson: Lesson) {
-    this.dialog.open(LessonDetails, {
-      data: lesson,
-      panelClass: 'lesson-dialog',
-      width: '450px',
-      maxWidth: '100vw',
-      height: '100dvh',
-      position: { right: '0', top: '0' },
-      autoFocus: 'first-tabbable',
-      restoreFocus: true,
-      ariaLabel: 'Szczegóły zajęć: ' + lesson.title,
-    });
+  lessonCount(count: number) {
+    return `${count} ${count === 1 ? 'blok zajęć' : count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14) ? 'bloki zajęć' : 'bloków zajęć'}`;
   }
   exportCsv() {
+    if (!this.selectedGroup()) return;
     const cell = (v: string) => `"${v.replaceAll('"', '""')}"`;
     const rows = [
       ['Data', 'Od', 'Do', 'Przedmiot', 'Forma', 'Grupa', 'Sala', 'Prowadzący', 'Uwagi'],
@@ -295,7 +275,7 @@ export class App implements OnDestroy {
     );
     const link = document.createElement('a');
     link.href = url;
-    link.download = `FizjoPlan_${this.weekend()}_1-1A.csv`;
+    link.download = `FizjoPlan_${this.weekend()}_1-${this.selectedGroup()}.csv`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }

@@ -6,20 +6,20 @@ html {
     (
       color: (
         theme-type: dark,
-        primary: mat.$cyan-palette,
+        primary: mat.$violet-palette,
       ),
       typography: 'Inter, sans-serif',
       density: 0,
     )
   );
-  --mat-sys-primary: #5eead4;
-  --mat-sys-on-primary: #092b27;
-  --mat-sys-surface: #131c26;
-  --mat-sys-surface-container-high: #17222e;
-  --mat-sys-on-surface: #edf2f7;
-  --mat-sys-on-surface-variant: #a6b3c2;
-  --mat-sys-outline: #334151;
-  --mat-sys-outline-variant: #283545;
+  --mat-sys-primary: #a8b8ef;
+  --mat-sys-on-primary: #101217;
+  --mat-sys-surface: #191c23;
+  --mat-sys-surface-container-high: #20242d;
+  --mat-sys-on-surface: #eef1f5;
+  --mat-sys-on-surface-variant: #a6aebc;
+  --mat-sys-outline: #2c323d;
+  --mat-sys-outline-variant: #2c323d;
   --mat-sys-corner-full: 9px;
   scroll-behavior: smooth;
   scroll-padding-top: 24px;
@@ -29,8 +29,8 @@ html {
 }
 body {
   margin: 0;
-  background: #0c1117;
-  color: #edf2f7;
+  background: #101217;
+  color: #eef1f5;
   font-family: 'Inter', 'Segoe UI', sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
@@ -56,7 +56,7 @@ a {
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid #5eead4;
+  outline: 2px solid #a8b8ef;
   outline-offset: 4px;
 }
 button[mat-stroked-button],
@@ -68,8 +68,8 @@ a[mat-stroked-button] {
 }
 button[mat-stroked-button],
 a[mat-stroked-button] {
-  border-color: #2c3846;
-  color: #d6dfe9;
+  border-color: #2c323d;
+  color: #eef1f5;
   border-radius: 8px;
 }
 .mat-mdc-button-base app-icon {
@@ -80,17 +80,17 @@ a[mat-stroked-button] {
   margin-right: 7px;
 }
 button[mat-icon-button] {
-  color: #a6b3c2;
+  color: #a6aebc;
 }
 .eyebrow {
-  color: #99abba;
+  color: #7d8798;
   font-size: 10px;
   letter-spacing: 1.8px;
   font-weight: 600;
 }
 .mat-mdc-progress-bar {
-  --mdc-linear-progress-active-indicator-color: #5eead4;
-  --mdc-linear-progress-track-color: #243d3d;
+  --mdc-linear-progress-active-indicator-color: #a8b8ef;
+  --mdc-linear-progress-track-color: #2c323d;
   --mdc-linear-progress-track-height: 3px;
   --mdc-linear-progress-active-indicator-height: 3px;
   border-radius: 4px;
@@ -98,13 +98,13 @@ button[mat-icon-button] {
 .lesson-dialog {
   .mat-mdc-dialog-surface {
     border-radius: 0;
-    background: #131c26;
-    border-left: 1px solid #283545;
+    background: #191c23;
+    border-left: 1px solid #2c323d;
   }
 }
 .detail-heading {
   padding: 20px 22px 16px 28px;
-  border-bottom: 1px solid #283545;
+  border-bottom: 1px solid #2c323d;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -113,7 +113,7 @@ button[mat-icon-button] {
   padding: 32px 28px;
 }
 .detail-type {
-  color: #5eead4;
+  color: #a8b8ef;
   font-size: 12px;
 }
 .detail-body h2.mat-mdc-dialog-title {
@@ -126,7 +126,7 @@ button[mat-icon-button] {
     display: none;
   }
 }
-.detail-body .mat-mdc-dialog-content {
+.lesson-dialog .detail-body .mat-mdc-dialog-content {
   padding: 0;
   max-height: none;
   overflow: visible;
@@ -142,15 +142,15 @@ button[mat-icon-button] {
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  border-top: 1px solid #25313f;
+  border-top: 1px solid #2c323d;
   padding: 20px 0;
   app-icon {
-    color: #92a5b7;
+    color: #7d8798;
     margin-top: 3px;
   }
   small {
     display: block;
-    color: #96a5b7;
+    color: #a6aebc;
     font-size: 11px;
     margin-bottom: 7px;
   }
@@ -158,17 +158,17 @@ button[mat-icon-button] {
     font-size: 14px;
     font-weight: 500;
     line-height: 1.6;
-    color: #e2eaf2;
+    color: #eef1f5;
   }
 }
 .detail-note {
   padding: 16px;
-  border: 1px solid #2c4948;
-  background: #172b2d;
+  border: 1px solid #2c323d;
+  background: #20242d;
   border-radius: 10px;
   display: flex;
   gap: 12px;
-  color: #a8d6d0;
+  color: #a8b8ef;
   p {
     margin: 0;
     font-size: 13px;
@@ -177,11 +177,11 @@ button[mat-icon-button] {
 }
 .detail-source {
   font-size: 11px;
-  color: #96a5b7;
+  color: #a6aebc;
   margin: 24px 0 0;
 }
 .cancel-note {
-  color: #f4acac;
+  color: #da9591;
 }
 @media (max-width: 700px) {
   .lesson-dialog {
@@ -193,7 +193,7 @@ button[mat-icon-button] {
     top: auto !important;
     .mat-mdc-dialog-surface {
       border-radius: 20px 20px 0 0;
-      border-top: 1px solid #283545;
+      border-top: 1px solid #2c323d;
     }
   }
   .detail-body {
@@ -214,5 +214,65 @@ button[mat-icon-button] {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+.mat-mdc-menu-item {
+  font-size: 13px;
+  letter-spacing: 0;
+  app-icon {
+    width: 17px;
+    height: 17px;
+    margin-right: 12px;
+    color: #a6aebc;
+  }
+}
+
+// Material menus are rendered in the overlay, outside the component's styles.
+.group-menu.mat-mdc-menu-panel {
+  width: 208px;
+  margin-top: 8px;
+  background: #191c23;
+  border: 1px solid #2c323d;
+  border-radius: 14px;
+  box-shadow: 0 12px 36px #0005;
+  --mat-menu-item-hover-state-layer-color: #20242d;
+  --mat-menu-item-focus-state-layer-color: #20242d;
+  .mat-mdc-menu-content {
+    padding: 6px;
+  }
+  .group-menu-heading {
+    padding: 10px 12px 9px;
+    color: #7d8798;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .group-option {
+    min-height: 46px;
+    border-radius: 8px;
+    margin-bottom: 3px;
+    color: #a6aebc;
+    &:last-child {
+      margin-bottom: 0;
+    }
+    &.selected-group {
+      background: #272c36;
+      color: #eef1f5;
+    }
+    .mat-mdc-menu-item-text {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    app-icon {
+      margin: 0;
+      width: 16px;
+      height: 16px;
+      color: #7d8798;
+    }
+    &.selected-group app-icon {
+      color: #a8b8ef;
+    }
   }
 }

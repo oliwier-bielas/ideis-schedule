@@ -41,7 +41,7 @@ jobs:
         run: npm run test:server
       - name: Test application logic
         run: npm test
-      - name: Fetch the semester and filter groups 1 and 1A
+      - name: Fetch the semester for groups 1, 1A and 1B
         run: npm run sync:schedule
       - name: Configure GitHub Pages
         id: pages

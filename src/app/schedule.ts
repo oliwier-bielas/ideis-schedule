@@ -5,7 +5,7 @@ export interface Lesson {
   end: string;
   title: string;
   type: 'Wykład' | 'Ćwiczenia' | 'Laboratorium';
-  group: 'all' | '1' | '1A';
+  group: 'all' | '1' | '1A' | '1B';
   sourceGroup: string;
   location: string;
   teacher: string;

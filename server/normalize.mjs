@@ -1,12 +1,13 @@
 export const SOURCE_URL = 'https://harmonogramy.ideis.pl/Plany/PlanyTokow/1516';
 
-// Match complete IDEIS group tokens. A substring match would also admit 1B / 10.
+// Match complete IDEIS group tokens, never group 2 or a prefix such as 10.
 export function classifyGroup(value) {
   const text = value.normalize('NFKC').trim();
   const token = text.split(/\s+/).at(-1);
   if (/^WykN$/i.test(token)) return 'all';
   if (/^(?:Ćw|Cw)1N$/i.test(token) || text === '1') return '1';
   if (/^Labor1AN$/i.test(token) || text === '1A') return '1A';
+  if (/^Labor1BN$/i.test(token) || text === '1B') return '1B';
   return null;
 }
 

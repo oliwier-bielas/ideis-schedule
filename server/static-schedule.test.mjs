@@ -17,6 +17,14 @@ const valid = () => ({
       group: '1A',
       sourceGroup: 'Fizjoterapia Jmgr 1sem Labor1AN',
     },
+    {
+      date: '2026-10-24',
+      start: '10:45',
+      end: '12:15',
+      title: 'Anatomia',
+      group: '1B',
+      sourceGroup: 'Fizjoterapia Jmgr 1sem Labor1BN',
+    },
   ],
 });
 test('Pages builds both at the domain root and under a repository path', () => {
@@ -27,14 +35,20 @@ test('Pages builds both at the domain root and under a repository path', () => {
     assert.throws(() => normalizeBasePath(value));
 });
 test('a valid current filtered snapshot can be published', () =>
-  assert.equal(validateStaticSchedule(valid(), now).lessons.length, 1));
+  assert.equal(validateStaticSchedule(valid(), now).lessons.length, 2));
 test('empty, stale and incorrectly filtered snapshots cannot replace a published plan', () => {
   assert.throws(() => validateStaticSchedule({ ...valid(), lessons: [] }, now), /pustego/);
   assert.throws(() => validateStaticSchedule(valid(), now + 13 * 60 * 60 * 1000), /nieaktualny/);
   const wrongGroup = valid();
-  wrongGroup.lessons[0].sourceGroup = 'Fizjoterapia Jmgr 1sem Labor1BN';
+  wrongGroup.lessons[0].sourceGroup = 'Fizjoterapia Jmgr 1sem Labor2AN';
   assert.throws(() => validateStaticSchedule(wrongGroup, now), /spoza grup/);
   const wrongTime = valid();
   wrongTime.lessons[0].end = '08:00';
   assert.throws(() => validateStaticSchedule(wrongTime, now), /format zajęć/);
+  const oldSnapshot = valid();
+  oldSnapshot.lessons = oldSnapshot.lessons.filter((lesson) => lesson.group !== '1B');
+  assert.throws(() => validateStaticSchedule(oldSnapshot, now), /Brak danych grupy 1B/);
+  const mismatch = valid();
+  mismatch.lessons[0].sourceGroup = 'Fizjoterapia Jmgr 1sem Labor1BN';
+  assert.throws(() => validateStaticSchedule(mismatch, now), /spoza grup/);
 });

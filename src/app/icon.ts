@@ -13,6 +13,9 @@ const paths: Record<string, string> = {
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M13 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
   left: 'm14 6-6 6 6 6',
   right: 'm10 6 6 6-6 6',
+  down: 'm6 9 6 6 6-6',
+  more: 'M4 12h1M11.5 12h1M19 12h1',
+  filter: 'M4 7h5m4 0h7M4 17h9m4 0h3M9 4v6m4 4v6',
   arrow: 'M5 12h14m-5-5 5 5-5 5',
   refresh:
     'M20 7v5h-5M4 17v-5h5M6.09 7a7 7 0 0 1 11.55-2.61L20 7M4 17l2.36 2.61A7 7 0 0 0 17.91 17',
