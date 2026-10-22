@@ -1,11 +1,12 @@
-name: Synchronize IDEIS and deploy Pages
+name: Deploy GitHub Pages
+run-name: Publikacja Pages · ${{ github.event_name }}
 
 on:
   push:
   workflow_dispatch:
-  schedule:
-    # UTC: 00:17, 03:17, 06:17, 09:17, 12:17, 15:17, 18:17, 21:17.
-    - cron: '17 */3 * * *'
+  workflow_run:
+    workflows: ['Synchronize IDEIS schedule']
+    types: [completed]
 
 permissions:
   contents: read
@@ -16,16 +17,22 @@ concurrency:
 
 jobs:
   build:
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: >-
+      (github.event_name != 'workflow_run' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     # Chrome keeps its sandbox on this runner (no Ubuntu 23.10+ AppArmor issue).
     runs-on: ubuntu-22.04
     timeout-minutes: 12
     permissions:
       contents: read
       pages: read
+      actions: read
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
@@ -35,13 +42,35 @@ jobs:
         run: npm ci
         env:
           PUPPETEER_SKIP_DOWNLOAD: 'true'
-      - name: Install Chrome for Puppeteer
-        run: npx puppeteer browsers install chrome
       - name: Test schedule rules
         run: npm run test:server
       - name: Test application logic
         run: npm test
-      - name: Fetch the semester for groups 1, 1A and 1B
+      - name: Find a verified schedule artifact
+        id: schedule_run
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { selectScheduleRun } = await import(`${process.env.GITHUB_WORKSPACE}/server/pages-schedule.mjs`);
+            const runId = await selectScheduleRun({ github, context });
+            core.setOutput('run-id', runId ?? '');
+      - name: Download the schedule from synchronization
+        if: steps.schedule_run.outputs.run-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ideis-schedule
+          path: public/data
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.schedule_run.outputs.run-id }}
+      - name: Validate restored schedule
+        id: schedule
+        run: node server/check-pages-schedule.mjs
+      - name: Install Chrome for first deployment or expired data
+        if: steps.schedule.outputs.needs-fetch == 'true'
+        run: npx puppeteer browsers install chrome
+      - name: Fetch schedule when publishing code without a current artifact
+        if: steps.schedule.outputs.needs-fetch == 'true'
         run: npm run sync:schedule
       - name: Configure GitHub Pages
         id: pages

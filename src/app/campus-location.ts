@@ -6,6 +6,7 @@ export interface CampusBuilding {
   readonly street: string;
   readonly latitude: number;
   readonly longitude: number;
+  readonly googlePlaceId: string;
 }
 
 // Addresses supplied by the user. Positions verified against the DSW campus
@@ -17,6 +18,7 @@ export const CAMPUS_BUILDINGS: readonly CampusBuilding[] = [
     street: 'ul. Strzegomska 55',
     latitude: 51.1142984,
     longitude: 16.9926546,
+    googlePlaceId: 'ChIJHTLq-PvBD0cRvlKluBaHqvA',
   },
   {
     code: 'S47',
@@ -24,6 +26,7 @@ export const CAMPUS_BUILDINGS: readonly CampusBuilding[] = [
     street: 'ul. Strzegomska 47',
     latitude: 51.1141182,
     longitude: 16.9966415,
+    googlePlaceId: 'ChIJt3Zwcf_BD0cRmoQqUH3knyc',
   },
   {
     code: 'W1',
@@ -31,6 +34,7 @@ export const CAMPUS_BUILDINGS: readonly CampusBuilding[] = [
     street: 'ul. Wagonowa 1',
     latitude: 51.1135976,
     longitude: 16.988142,
+    googlePlaceId: 'ChIJyVr4SSfBD0cRPnz9VdiwW3E',
   },
 ];
 
@@ -59,9 +63,12 @@ export function findCampusBuilding(
 export function campusNavigationUrl(building: CampusBuilding): string {
   const url = new URL('https://www.google.com/maps/dir/');
   url.searchParams.set('api', '1');
-  // A textual address can resolve to the whole street in Google Maps. Use the
-  // verified campus POI position so the building number cannot be discarded.
-  url.searchParams.set('destination', `${building.latitude},${building.longitude}`);
+  // Pass the complete street address, including the building number, city and
+  // country, so Google Maps receives the address the student sees in the app.
+  url.searchParams.set('destination', `${building.street}, Wrocław, Polska`);
+  // Google can drop the house number when geocoding the address alone. These
+  // IDs were verified on Google Maps against each building's displayed address.
+  url.searchParams.set('destination_place_id', building.googlePlaceId);
   url.searchParams.set('dir_action', 'navigate');
   // Let Google Maps use the device's position and preferred transport mode.
   return url.href;

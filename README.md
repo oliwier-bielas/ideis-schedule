@@ -4,21 +4,29 @@ Jednostronicowa aplikacja Angular 22 + Angular Material dla studentów fizjotera
 
 ## GitHub Pages — publikacja i synchronizacja co 3 godziny
 
-Wersja Pages działa bez własnego serwera. Workflow `.github/workflows/pages.yml` uruchamia Puppeteer na GitHub Actions, pobiera cały semestr, zachowuje grupy **1, 1A, 1B i wykłady wspólne**, zapisuje JSON i publikuje gotowego Angulara wraz z planem. Aplikacja pokazuje zajęcia wybranej podgrupy 1A albo 1B wraz ze wspólnymi ćwiczeniami grupy 1 i wykładami.
+Wersja Pages działa bez własnego serwera. Pobieranie danych i publikacja są rozdzielone:
+
+- `.github/workflows/sync-schedule.yml` — **Synchronize IDEIS schedule**: co 3 godziny uruchamia Puppeteer, pobiera cały semestr dla grup **1, 1A, 1B i wykładów wspólnych**, sprawdza dane i zapisuje artefakt `ideis-schedule` z plikiem `schedule.json`. Można też uruchomić go ręcznie.
+- `.github/workflows/pages.yml` — **Deploy GitHub Pages**: automatycznie publikuje aplikację po pushu kodu na domyślną gałąź, ręcznym uruchomieniu oraz po **udanej synchronizacji** planu (`workflow_run`). Sam nie ma crona. Dzięki powiązaniu workflowów plan pobrany w tle rzeczywiście trafia na działającą stronę.
+
+Aplikacja pokazuje zajęcia wybranej podgrupy 1A albo 1B wraz ze wspólnymi ćwiczeniami grupy 1 i wykładami.
 
 ### Jednorazowe uruchomienie na GitHubie
 
 1. Utwórz **publiczne repozytorium** i prześlij kod, w tym katalog `.github/workflows/` oraz `scripts/`.
 2. W repozytorium wybierz **Settings → Pages → Build and deployment → Source → GitHub Actions**.
-3. Wejdź w **Actions → Synchronize IDEIS and deploy Pages → Run workflow** na domyślnej gałęzi. Pierwszy push również uruchamia workflow; jeżeli Pages nie były wtedy jeszcze włączone, uruchom go ręcznie po kroku 2.
+3. Wejdź w **Actions → Deploy GitHub Pages → Run workflow** na domyślnej gałęzi. Pierwszy push również uruchamia publikację; jeżeli Pages nie były wtedy jeszcze włączone, uruchom ją ręcznie po kroku 2. Przy pierwszej publikacji Pages pobierze plan, jeżeli nie ma jeszcze artefaktu synchronizacji.
 4. Po sukcesie link do strony znajdziesz w zadaniu `deploy` i w **Settings → Pages**.
 
 Nie trzeba dodawać tokenów ani sekretów. Workflow korzysta z automatycznego `GITHUB_TOKEN`. Obsługuje dowolną nazwę domyślnej gałęzi (np. `master` lub `main`) i automatycznie dopasowuje ścieżkę `/<nazwa-repozytorium>/`, adres `*.github.io` albo domenę skonfigurowaną w Pages. Nie uruchamia publikacji z gałęzi roboczych.
 
-- Harmonogram: `17 */3 * * *`, czyli **co 3 godziny, w 17. minucie**, według UTC. GitHub może opóźnić zadanie; nie jest to gwarancja uruchomienia o konkretnej minucie. [Dokumentacja harmonogramów](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
-- Synchronizacja ma trzy próby. Błędny, pusty, nieaktualny lub nieprawidłowo przefiltrowany plan przerywa publikację. Ostatnia poprawna wersja strony nadal działa; dane nie są nadpisywane wynikiem błędu.
+- Harmonogram w `sync-schedule.yml`: `17 0,3,6,9,12,15,18,21 * * *`, czyli **co 3 godziny, w 17. minucie**, według UTC. W polskim czasie letnim są to 02:17, 05:17, 08:17, 11:17, 14:17, 17:17, 20:17 i 23:17; zimą godzinę wcześniej. Ręczna publikacja nie przesuwa tych terminów. GitHub może opóźnić lub pominąć zadanie; nie jest to gwarancja uruchomienia o konkretnej minucie. [Dokumentacja harmonogramów](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+- Nazwa uruchomienia pokazuje wyzwalacz: w pobieraniu `schedule` oznacza automat, a w Pages `push` publikację kodu i `workflow_run` publikację po synchronizacji. `workflow_dispatch` to ręczne „Run workflow”.
+- Synchronizacja ma trzy próby. Błąd pobierania nie uruchamia budowania Pages. Błędny, pusty, nieaktualny lub nieprawidłowo przefiltrowany artefakt zatrzymuje publikację. Ostatnia poprawna wersja strony nadal działa.
+- Po synchronizacji Pages pobiera artefakt z dokładnie tego uruchomienia. Przy pushu kodu szuka najnowszego dostępnego, poprawnego artefaktu z domyślnej gałęzi i tego samego repozytorium. Gdy go nie ma, wygasł albo zawiera plan starszy niż 12 godzin, Pages pobiera świeży plan podczas publikacji. To umożliwia pierwsze wdrożenie bez ręcznego uruchamiania synchronizacji.
+- Artefakty planu są przechowywane 7 dni. Ich pobieranie wykorzystuje `actions: read` automatycznego tokenu. Publikacja po `workflow_run` akceptuje tylko udaną synchronizację z domyślnej gałęzi własnego repozytorium; kod aplikacji jest zawsze pobierany z aktualnej domyślnej gałęzi.
 - W podsumowaniu zadania w Actions widać liczbę zajęć, zakres semestru i datę pobrania. Aplikacja pokazuje datę ostatniego pobrania; przycisk odświeżania wczytuje ostatnio opublikowany JSON. Otwarta karta otrzyma nowe dane po odświeżeniu lub ponownym wejściu.
-- Sam JSON jest generowany podczas budowania i ignorowany przez Git. Zwykła synchronizacja nie dopisuje commitów do repozytorium.
+- Sam JSON pochodzi z artefaktu synchronizacji (lub pobrania przy pierwszym wdrożeniu) i jest ignorowany przez Git. Zwykła synchronizacja nie dopisuje commitów do repozytorium.
 - Publiczne repozytorium z Pages i standardowymi runnerami Actions może działać bez opłat. Kod i opublikowany plan są publiczne. [Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site), [Actions](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
 ### Cotygodniowy pusty commit w Pythonie
@@ -102,7 +110,7 @@ Grupy `Ćw2N`, `Labor2AN`, `Labor2BN` i nierozpoznane oznaczenia są odrzucane. 
 - Na komputerze trzy kolumny dni; na telefonie jeden wybrany dzień, marginesy 16 px, odstępy 12 px i karty bez zewnętrznej ramki. Domyślnie dzisiejszy dzień lub pierwszy dzień z zajęciami. Zakładki obsługują strzałki, Home i End.
 - Filtr „Typ zajęć” korzysta z menu Angular Material; wybrany typ można wyczyścić bez zmiany dnia. Eksport całego zjazdu do CSV, odświeżenie i link do IDEIS są w menu dodatkowych akcji obok tytułu.
 - Kliknięcie karty rozwija szczegóły w miejscu: prowadzącego, czas trwania, grupę, bloki godzinowe, zaliczenie, uwagi i mapę. Kolejne bloki tego samego przedmiotu, prowadzącego, formy, grupy i miejsca łączą się w jedną kartę. Rozwinięcie pokazuje osobno „Blok 1”, przerwę i „Blok 2” z oryginalnymi godzinami. Przerwa nie wlicza się do czasu zajęć ani statusu „Trwa teraz”. Łączenie odbywa się przed filtrowaniem, bez zmiany danych eksportu CSV. Zajęcia zdalne i odwołane mają jawne oznaczenia.
-- W szczegółach zajęć dla S55 (Gmach Główny, ul. Strzegomska 55), S47 (ul. Strzegomska 47) i W1 (ul. Wagonowa 1) jest klikalna mapka oraz przycisk „Nawiguj w Google Maps”. Wszystkie adresy we Wrocławiu. Podgląd pochodzi z OpenStreetMap, a nawigacja korzysta z [uniwersalnych linków Google Maps](https://developers.google.com/maps/documentation/urls/get-started) bez klucza API. Celem trasy są zweryfikowane współrzędne konkretnego budynku, ponieważ Google potrafi rozpoznać adres tekstowy jako samą ulicę i pominąć numer. Pełny adres pozostaje widoczny w aplikacji. Na telefonie link otwiera aplikację Google Maps, jeśli jest zainstalowana; inaczej mapy w przeglądarce. Google Maps korzysta z pozycji urządzenia, a przy jej braku pokazuje podgląd trasy. Zajęcia zdalne i nierozpoznane lub niejednoznaczne budynki nie otrzymują mapy ani zgadywanego adresu.
+- W szczegółach zajęć dla S55 (Gmach Główny, ul. Strzegomska 55), S47 (ul. Strzegomska 47) i W1 (ul. Wagonowa 1) jest klikalna mapka oraz przycisk „Nawiguj w Google Maps”. Wszystkie adresy we Wrocławiu. Podgląd pochodzi z OpenStreetMap, a nawigacja korzysta z [uniwersalnych linków Google Maps](https://developers.google.com/maps/documentation/urls/get-started) bez klucza API. Zarówno kliknięcie mapki, jak i przycisku przekazuje w parametrze `destination` pełny adres, np. `ul. Strzegomska 55, Wrocław, Polska`, oraz `destination_place_id` zweryfikowanego budynku. Sam adres nie wystarczał: w sprawdzeniu Google Maps ignorowało numer 55 i wybierało ulicę. Każdy budynek ma osobny identyfikator Google; po dodaniu identyfikatora cel trasy zachował adres „Strzegomska 55, 53-611 Wrocław”. Podgląd OpenStreetMap nadal wskazuje współrzędne budynku. Na telefonie link otwiera aplikację Google Maps, jeśli jest zainstalowana; inaczej mapy w przeglądarce. Google Maps korzysta z pozycji urządzenia, a przy jej braku pokazuje podgląd trasy. Zajęcia zdalne i nierozpoznane lub niejednoznaczne budynki nie otrzymują mapy ani zgadywanego adresu.
 - Osobne stany ładowania, błędu, pustego dnia, braku zajęć wybranego typu i weekendu poza semestrem.
 - Po błędzie pobrania można wyświetlić ostatnią poprawną kopię z `localStorage` (`fizjoplan:schedule:v2`); banner wyraźnie informuje o możliwej nieaktualności i dacie pobrania. Kopia obejmuje obie podgrupy i nadal jest filtrowana według wyboru użytkownika. Stara kopia v1 zawierająca tylko 1A nie jest używana jako plan 1B. Kopia nigdy nie zastępuje próby odświeżenia przy otwarciu strony.
 - Nawigacja klawiaturą, etykiety przycisków, focus, ograniczone animacje przy `prefers-reduced-motion`. Font Inter z Google Fonts ma lokalny fallback systemowy.
@@ -115,7 +123,7 @@ npm run test:server
 npm run build
 ```
 
-Testy obejmują odrzucanie innych grup, rozdzielenie planu 1A i 1B, zapis i odczyt wyboru, błędny lub zablokowany storage, normalizację rzeczywistych kolumn IDEIS, odwołane i zdalne zajęcia, granice godzin, statusy dnia, wybór weekendu i zmianę czasu w Warszawie. Testy prezentacji sprawdzają stałość kolorów, łączenie bloków, zachowanie oryginalnych godzin i rozróżnienie przerwy od zajęć.
+Testy obejmują odrzucanie innych grup, rozdzielenie planu 1A i 1B, zapis i odczyt wyboru, błędny lub zablokowany storage, normalizację rzeczywistych kolumn IDEIS, odwołane i zdalne zajęcia, granice godzin, statusy dnia, wybór weekendu i zmianę czasu w Warszawie. Testy prezentacji sprawdzają stałość kolorów, łączenie bloków, zachowanie oryginalnych godzin i rozróżnienie przerwy od zajęć. Testy publikacji sprawdzają przekazywanie artefaktu z właściwego uruchomienia, brak artefaktu przy pierwszym wdrożeniu, dane wygasłe i odrzucanie wyników z obcych repozytoriów lub gałęzi.
 
 Po uruchomieniu `npm start` można dodatkowo uruchomić:
 

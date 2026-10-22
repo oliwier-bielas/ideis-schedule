@@ -334,17 +334,15 @@ try {
   const url = new URL(navigationHref);
   assert.equal(url.origin, 'https://www.google.com');
   assert.equal(url.searchParams.get('dir_action'), 'navigate');
-  assert.match(url.searchParams.get('destination'), /^51\.\d+,16\.\d+$/);
+  assert.equal(url.searchParams.get('destination'), 'ul. Strzegomska 55, Wrocław, Polska');
+  assert.equal(url.searchParams.get('destination_place_id'), 'ChIJHTLq-PvBD0cRvlKluBaHqvA');
   assert.equal(await page.$eval(`${visibleDay} .map-preview`, (el) => el.href), navigationHref);
   await page.$eval(`${visibleDay} app-lesson-map`, (el) => el.scrollIntoView({ block: 'center' }));
   const preview = await page.$eval(`${visibleDay} app-lesson-map iframe`, (el) => ({
     src: el.src,
     tabIndex: el.tabIndex,
   }));
-  assert.equal(
-    new URL(preview.src).searchParams.get('marker'),
-    url.searchParams.get('destination'),
-  );
+  assert.equal(new URL(preview.src).searchParams.get('marker'), '51.1142984,16.9926546');
   assert.equal(preview.tabIndex, -1);
   const previewFrame = await (await page.$(`${visibleDay} app-lesson-map iframe`)).contentFrame();
   await previewFrame.waitForSelector('#map canvas, #map img', { timeout: 20000 });

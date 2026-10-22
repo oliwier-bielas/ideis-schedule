@@ -35,18 +35,23 @@ describe('campus directions', () => {
       expect(findCampusBuilding({ location, online: false }), location).toBeNull();
     }
   });
-  it('opens Google Maps navigation to the exact building position without fixing the origin', () => {
+  it('opens Google Maps with the full street address, building number, city and country', () => {
+    const addresses = {
+      S55: 'ul. Strzegomska 55, Wrocław, Polska',
+      S47: 'ul. Strzegomska 47, Wrocław, Polska',
+      W1: 'ul. Wagonowa 1, Wrocław, Polska',
+    };
     for (const building of CAMPUS_BUILDINGS) {
       const url = new URL(campusNavigationUrl(building));
       expect(url.origin).toBe('https://www.google.com');
       expect(url.pathname).toBe('/maps/dir/');
       expect(url.searchParams.get('api')).toBe('1');
-      expect(url.searchParams.get('destination')).toBe(
-        `${building.latitude},${building.longitude}`,
-      );
+      expect(url.searchParams.get('destination')).toBe(addresses[building.code]);
+      expect(url.searchParams.get('destination_place_id')).toBe(building.googlePlaceId);
       expect(url.searchParams.get('dir_action')).toBe('navigate');
       expect(url.searchParams.has('origin')).toBe(false);
     }
+    expect(new Set(CAMPUS_BUILDINGS.map((building) => building.googlePlaceId)).size).toBe(3);
   });
   it('uses the known campus position for the map preview', () => {
     for (const building of CAMPUS_BUILDINGS) {
