@@ -3,6 +3,10 @@
 # Compiled output
 /dist
 /tmp
+/public/data/schedule.json
+/public/data/*.tmp
+__pycache__/
+*.pyc
 /out-tsc
 /bazel-out
 
