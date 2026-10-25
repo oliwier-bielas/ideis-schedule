@@ -77,7 +77,7 @@ try {
       (value) =>
         localStorage.getItem('fizjoplan:group:v1') === value &&
         [...document.querySelectorAll('.lesson-card')].every((el) =>
-          ['1', 'all', value].includes(el.getAttribute('data-group')),
+          [value[0], 'all', value].includes(el.getAttribute('data-group')),
         ),
       {},
       group,
@@ -98,6 +98,12 @@ try {
   await page.setViewport({ width: 1440, height: 1100, deviceScaleFactor: 1 });
   await page.goto(target, { waitUntil: 'networkidle2' });
   await page.waitForSelector('.group-welcome');
+  assert.deepEqual(
+    await page.$$eval('[data-group-choice]', (els) =>
+      els.map((el) => el.getAttribute('data-group-choice')),
+    ),
+    ['1A', '1B', '2A', '2B'],
+  );
   assert.equal(
     await page.$('.calendar-board'),
     null,
@@ -130,7 +136,7 @@ try {
   await checkOverflow(320);
   await page.screenshot({ path: 'tmp/group-menu-mobile.png' });
   await page.keyboard.press('End');
-  assert.match(await page.evaluate(() => document.activeElement.textContent), /Grupa 1B/);
+  assert.match(await page.evaluate(() => document.activeElement.textContent), /Grupa 2B/);
   await page.keyboard.press('Escape');
   await page.waitForSelector('.group-menu', { hidden: true });
   assert.equal(
@@ -142,10 +148,14 @@ try {
   assert.equal(await page.$('.lesson-card[data-group="1B"]'), null);
   await page.setViewport({ width: 1440, height: 1100, deviceScaleFactor: 1 });
   const saved = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('fizjoplan:schedule:v2')),
+    JSON.parse(localStorage.getItem('fizjoplan:schedule:v3')),
   );
   assert.ok(saved.lessons.length > 0);
-  assert.ok(saved.lessons.every((lesson) => ['1', '1A', '1B', 'all'].includes(lesson.group)));
+  assert.ok(
+    saved.lessons.every((lesson) =>
+      ['1', '1A', '1B', '2', '2A', '2B', 'all'].includes(lesson.group),
+    ),
+  );
   if (pagesMode) {
     assert.equal(new URL(scheduleRequests[0]).pathname, base + 'data/schedule.json');
     assert.ok(scheduleRequests.every((url) => !url.includes('/api/')));
@@ -159,7 +169,7 @@ try {
   );
   await page.screenshot({ path: 'tmp/desktop.png', fullPage: true });
   const friday = saved.lessons.filter(
-    (lesson) => lesson.date === '2026-10-23' && lesson.group !== '1B',
+    (lesson) => lesson.date === '2026-10-23' && ['1', '1A', 'all'].includes(lesson.group),
   );
   assert.ok(friday.length > 0, 'The real source has lessons on the QA weekend');
   const shownTitle = friday[0].title;
@@ -218,7 +228,7 @@ try {
       lesson.date >= '2026-10-23' &&
       lesson.date <= '2026-10-25' &&
       !lesson.canceled &&
-      lesson.group !== '1B',
+      ['1', '1A', 'all'].includes(lesson.group),
   );
   assert.equal(
     csv.split('\r\n').length - 1,
@@ -242,9 +252,68 @@ try {
         lesson.date >= '2026-10-23' &&
         lesson.date <= '2026-10-25' &&
         !lesson.canceled &&
-        lesson.group !== '1A',
+        ['1', '1B', 'all'].includes(lesson.group),
     ).length,
   );
+  await page.evaluate(() =>
+    sessionStorage.setItem('test:clock', String(Date.parse('2026-11-06T06:00:00Z'))),
+  );
+  await page.reload({ waitUntil: 'networkidle2' });
+  await waitForSchedule();
+  for (const group of ['2A', '2B']) {
+    await selectGroup(group);
+    assert.ok(await page.$(`.lesson-card[data-group="${group}"]`));
+    assert.ok(await page.$('.lesson-card[data-group="2"]'));
+    assert.equal(await page.$('.lesson-card[data-group="1"]'), null);
+    await page.reload({ waitUntil: 'networkidle2' });
+    await waitForSchedule();
+    assert.match(
+      await page.$eval('.group-label', (el) => el.innerText),
+      new RegExp(`Grupa ${group}`),
+    );
+    await page.evaluate(() => {
+      window.__exportedBlob = null;
+    });
+    // Reload restores the native download handler; capture the CSV again.
+    await page.evaluate(() => {
+      URL.createObjectURL = (blob) => {
+        window.__exportedBlob = blob;
+        return 'blob:test';
+      };
+      HTMLAnchorElement.prototype.click = function () {
+        window.__exportedName = this.download;
+      };
+    });
+    await selectMenu('[aria-label="Więcej akcji"]', 'Eksportuj zjazd do CSV');
+    await page.waitForFunction(() => !!window.__exportedBlob);
+    const groupCsv = await page.evaluate(() => window.__exportedBlob.text());
+    assert.ok(groupCsv.includes(`"${group}"`) && groupCsv.includes('"2"'));
+    for (const other of ['1', '1A', '1B', group === '2A' ? '2B' : '2A'])
+      assert.ok(!groupCsv.includes(`"${other}"`), `${group} CSV excludes ${other}`);
+    assert.equal(
+      groupCsv.split('\r\n').length - 1,
+      saved.lessons.filter(
+        (lesson) =>
+          lesson.date >= '2026-11-06' &&
+          lesson.date <= '2026-11-08' &&
+          !lesson.canceled &&
+          ['all', '2', group].includes(lesson.group),
+      ).length,
+    );
+    assert.match(
+      await page.evaluate(() => window.__exportedName),
+      new RegExp(`_2-${group}\\.csv$`),
+    );
+    await page.setViewport({ width: 320, height: 844, deviceScaleFactor: 1 });
+    await checkOverflow(320);
+    await page.screenshot({ path: `tmp/group-${group.toLowerCase()}-mobile.png`, fullPage: true });
+    await page.setViewport({ width: 1440, height: 1100, deviceScaleFactor: 1 });
+  }
+  await page.evaluate(() =>
+    sessionStorage.setItem('test:clock', String(Date.parse('2026-10-22T16:00:00Z'))),
+  );
+  await page.reload({ waitUntil: 'networkidle2' });
+  await waitForSchedule();
   await selectGroup('1A');
 
   await selectMenu('.filter-button', 'Laboratorium');
@@ -403,6 +472,7 @@ try {
   );
   assert.ok(await page.$('.lesson-card[data-group="1B"].is-live'));
   await page.screenshot({ path: 'tmp/group-1b-live-mobile.png', fullPage: true });
+  await selectGroup('2B');
 
   page.removeAllListeners('request');
   await page.setRequestInterception(true);
@@ -423,11 +493,15 @@ try {
     null,
     'Offline fallback keeps the selected group',
   );
-  await page.evaluate(() => localStorage.removeItem('fizjoplan:schedule:v2'));
+  await page.reload({ waitUntil: 'networkidle2' });
+  await page.waitForSelector('.error-banner');
+  assert.match(await page.$eval('.group-label', (el) => el.innerText), /Grupa 2B/);
+  assert.ok(await page.$('.lesson-card[data-group="2"]'));
+  await page.evaluate(() => localStorage.removeItem('fizjoplan:schedule:v3'));
   await page.reload({ waitUntil: 'networkidle2' });
   await page.waitForSelector('.error-banner');
   assert.match(await page.$eval('.day-content', (el) => el.innerText), /Plan niedostępny/);
-  await page.evaluate(() => localStorage.setItem('fizjoplan:group:v1', '2A'));
+  await page.evaluate(() => localStorage.setItem('fizjoplan:group:v1', '3A'));
   await page.reload({ waitUntil: 'networkidle2' });
   await page.waitForSelector('.group-welcome');
   assert.equal(

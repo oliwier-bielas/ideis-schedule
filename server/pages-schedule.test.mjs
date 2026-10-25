@@ -87,7 +87,7 @@ const snapshot = () => ({
   source: SOURCE_URL,
   fetchedAt: new Date(now).toISOString(),
   semester: { from: '2026-09-11', to: '2027-02-07' },
-  lessons: ['1A', '1B'].map((group) => ({
+  lessons: ['1A', '1B', '2A', '2B'].map((group) => ({
     date: '2026-10-24',
     start: '09:00',
     end: '10:30',

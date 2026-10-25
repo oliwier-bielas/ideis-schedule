@@ -87,9 +87,9 @@ export async function fetchSchedule() {
     const lessons = normalizeRows(result.rows);
     if (result.rows.length && !lessons.length)
       throw new Error(
-        'Tabela zawiera zajęcia, ale nie rozpoznano grup 1 / 1A / 1B ani wykładów wspólnych.',
+        'Tabela zawiera zajęcia, ale nie rozpoznano grup 1 / 1A / 1B / 2 / 2A / 2B ani wykładów wspólnych.',
       );
-    for (const group of ['1A', '1B']) {
+    for (const group of ['1A', '1B', '2A', '2B']) {
       if (!lessons.some((lesson) => lesson.group === group))
         throw new Error(`Nie znaleziono zajęć grupy ${group} w planie całego semestru.`);
     }

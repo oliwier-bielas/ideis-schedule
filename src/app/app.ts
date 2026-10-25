@@ -12,6 +12,7 @@ import {
   readSavedGroup,
   saveGroup,
   SCHEDULE_STORAGE_KEY,
+  SUBGROUPS,
 } from './group-selection';
 import {
   defaultWeekend,
@@ -30,6 +31,7 @@ import {
   styleUrl: './app.scss',
 })
 export class App implements OnDestroy {
+  readonly subgroups = SUBGROUPS;
   readonly selectedGroup = signal(readSavedGroup());
   readonly preferenceSaved = signal(true);
   readonly now = signal(warsawNow());
@@ -160,16 +162,16 @@ export class App implements OnDestroy {
     if (
       data.lessons.some(
         (l) =>
-          !['1', '1A', '1B', 'all'].includes(l.group) ||
+          !['1', '2', ...SUBGROUPS, 'all'].includes(l.group) ||
           !/^\d{4}-\d{2}-\d{2}$/.test(l.date) ||
           !/^\d{2}:\d{2}$/.test(l.start) ||
           !/^\d{2}:\d{2}$/.test(l.end),
       )
     )
       throw new Error('Odpowiedź zawiera nierozpoznaną grupę lub format zajęć.');
-    if (!['1A', '1B'].every((group) => data.lessons.some((lesson) => lesson.group === group)))
+    if (!SUBGROUPS.every((group) => data.lessons.some((lesson) => lesson.group === group)))
       throw new Error(
-        'Plan nie zawiera danych obu grup 1A i 1B. Wymagana jest ponowna synchronizacja.',
+        'Plan nie zawiera danych wszystkich grup 1A, 1B, 2A i 2B. Wymagana jest ponowna synchronizacja.',
       );
     this.schedule.set(data);
     this.pickDefaultDay();
@@ -275,7 +277,7 @@ export class App implements OnDestroy {
     );
     const link = document.createElement('a');
     link.href = url;
-    link.download = `FizjoPlan_${this.weekend()}_1-${this.selectedGroup()}.csv`;
+    link.download = `FizjoPlan_${this.weekend()}_${this.selectedGroup()![0]}-${this.selectedGroup()}.csv`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }

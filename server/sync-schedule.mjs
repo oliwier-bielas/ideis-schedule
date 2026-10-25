@@ -29,7 +29,7 @@ if (schedule) {
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(
       process.env.GITHUB_STEP_SUMMARY,
-      `### Synchronizacja planu\n\n- Zajęcia po filtrowaniu: **${schedule.lessons.length}**\n- Grupy: **1, 1A, 1B i wykłady wspólne**\n- Pobranie: ${schedule.fetchedAt}\n- Semestr: ${schedule.semester.from} – ${schedule.semester.to}\n`,
+      `### Synchronizacja planu\n\n- Zajęcia po filtrowaniu: **${schedule.lessons.length}**\n- Grupy: **1, 1A, 1B, 2, 2A, 2B i wykłady wspólne**\n- Pobranie: ${schedule.fetchedAt}\n- Semestr: ${schedule.semester.from} – ${schedule.semester.to}\n`,
     );
   }
 }

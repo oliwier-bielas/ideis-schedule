@@ -24,10 +24,12 @@ export function validateStaticSchedule(schedule, now = Date.now()) {
     throw new Error('Brak zakresu semestru.');
   for (const lesson of schedule.lessons) {
     if (
-      !['1', '1A', '1B', 'all'].includes(lesson.group) ||
+      !['1', '1A', '1B', '2', '2A', '2B', 'all'].includes(lesson.group) ||
       classifyGroup(lesson.sourceGroup ?? '') !== lesson.group
     ) {
-      throw new Error('Plan zawiera zajęcia spoza grup 1 / 1A / 1B i wykładów wspólnych.');
+      throw new Error(
+        'Plan zawiera zajęcia spoza grup 1 / 1A / 1B / 2 / 2A / 2B i wykładów wspólnych.',
+      );
     }
     if (
       !date.test(lesson.date) ||
@@ -40,7 +42,7 @@ export function validateStaticSchedule(schedule, now = Date.now()) {
       throw new Error('Nieprawidłowy format zajęć. Publikacja została zatrzymana.');
     }
   }
-  for (const group of ['1A', '1B']) {
+  for (const group of ['1A', '1B', '2A', '2B']) {
     if (!schedule.lessons.some((lesson) => lesson.group === group))
       throw new Error(`Brak danych grupy ${group}. Uruchom npm run sync:schedule.`);
   }

@@ -17,7 +17,7 @@
     </button>
     <mat-menu #groupMenu="matMenu" class="group-menu" xPosition="before" aria-label="Wybór grupy">
       <div class="group-menu-heading">Grupa laboratoryjna</div>
-      @for (group of ['1A', '1B']; track group) {
+      @for (group of subgroups; track group) {
         <button
           mat-menu-item
           class="group-option"
@@ -268,14 +268,15 @@
       <div class="welcome-icon"><app-icon name="calendar" /></div>
       <h1>Twój plan zajęć</h1>
       <p>
-        Wybierz grupę, aby zobaczyć swój plan. Dodamy do niego ćwiczenia grupy 1 i wykłady wspólne.
+        Wybierz grupę, aby zobaczyć swój plan. Dodamy do niego ćwiczenia Twojej grupy i wykłady
+        wspólne.
       </p>
       <div class="group-options">
-        <button mat-stroked-button (click)="chooseGroup('1A')" data-group-choice="1A">
-          Grupa 1A</button
-        ><button mat-stroked-button (click)="chooseGroup('1B')" data-group-choice="1B">
-          Grupa 1B
-        </button>
+        @for (group of subgroups; track group) {
+          <button mat-stroked-button (click)="chooseGroup(group)" [attr.data-group-choice]="group">
+            Grupa {{ group }}
+          </button>
+        }
       </div>
       <p class="welcome-hint">
         Zapamiętamy wybór w tej przeglądarce. Grupę możesz zmienić w prawym górnym rogu.

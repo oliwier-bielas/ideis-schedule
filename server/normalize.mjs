@@ -1,13 +1,15 @@
 export const SOURCE_URL = 'https://harmonogramy.ideis.pl/Plany/PlanyTokow/1516';
 
-// Match complete IDEIS group tokens, never group 2 or a prefix such as 10.
+// Match complete IDEIS group tokens, never a prefix such as 10 or 20.
 export function classifyGroup(value) {
   const text = value.normalize('NFKC').trim();
   const token = text.split(/\s+/).at(-1);
   if (/^WykN$/i.test(token)) return 'all';
-  if (/^(?:Ćw|Cw)1N$/i.test(token) || text === '1') return '1';
-  if (/^Labor1AN$/i.test(token) || text === '1A') return '1A';
-  if (/^Labor1BN$/i.test(token) || text === '1B') return '1B';
+  const exercise = token.match(/^(?:Ćw|Cw)([12])N$/i);
+  if (exercise) return exercise[1];
+  const lab = token.match(/^Labor([12][AB])N$/i);
+  if (lab) return lab[1].toUpperCase();
+  if (/^[12](?:[AB])?$/.test(text)) return text;
   return null;
 }
 
